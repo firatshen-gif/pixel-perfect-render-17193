@@ -43,6 +43,23 @@ export const Route = createFileRoute("/reports")({
 
 type Filters = { player: string; table: string; game: string; date: string; from: string; to: string };
 const EMPTY: Filters = { player: "", table: "", game: "", date: "", from: "", to: "" };
+const EXCEL_EPOCH_DAYS = 25569;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const ISTANBUL_OFFSET_DAYS = 3 / 24;
+
+function excelIstanbulDate(iso: string | null) {
+  if (!iso) return "";
+
+  return (
+    new Date(iso).getTime() / MS_PER_DAY +
+    EXCEL_EPOCH_DAYS +
+    ISTANBUL_OFFSET_DAYS
+  );
+}
+
+function excelDuration(ms: number) {
+  return ms / MS_PER_DAY;
+}
 
 function ReportsPage() {
   const sessions = useCompletedSessions();
@@ -101,32 +118,90 @@ function ReportsPage() {
   const set = (k: keyof Filters) => (v: string) => setF((p) => ({ ...p, [k]: v }));
   const active = Object.values(f).some(Boolean);
 
-  const exportExcel = () => {
-    let rows: Record<string, string | number>[];
-    let sheet: string;
+const exportExcel = () => {
+  let rows: Record<string, string | number>[];
+  let sheetName: string;
+
+  if (tab === "players") {
+    sheetName = "By player";
+
+    rows = playerSummary.map((r) => ({
+      Player: r.name,
+      "Total time": excelDuration(r.ms),
+      Sessions: r.n,
+    }));
+  } else if (tab === "tables") {
+    sheetName = "By table";
+
+    rows = tableSummary.map((r) => ({
+      Table: r.name,
+      Game: r.game,
+      "Total time": excelDuration(r.ms),
+      Sessions: r.n,
+      "Unique players": r.players.size,
+    }));
+  } else {
+    sheetName = "Sessions";
+
+    rows = filtered.map((s) => ({
+      Player: s.player.full_name,
+      Table: s.table.name,
+      Game: s.table.game_type,
+      Seated: excelIstanbulDate(s.seated_at),
+      Left: excelIstanbulDate(s.left_at),
+      Duration: excelDuration(
+        sessionMs(s.seated_at, s.left_at),
+      ),
+    }));
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Apply real Excel number/date formats.
+  for (let row = 2; row <= rows.length + 1; row++) {
     if (tab === "players") {
-      sheet = "By player";
-      rows = playerSummary.map((r) => ({ Player: r.name, "Total time": formatDuration(r.ms), Sessions: r.n }));
+      const totalTimeCell = ws[`B${row}`];
+
+      if (totalTimeCell) {
+        totalTimeCell.z = "[h]:mm";
+      }
     } else if (tab === "tables") {
-      sheet = "By table";
-      rows = tableSummary.map((r) => ({
-        Table: r.name, Game: r.game, "Total time": formatDuration(r.ms), Sessions: r.n, "Unique players": r.players.size,
-      }));
+      const totalTimeCell = ws[`C${row}`];
+
+      if (totalTimeCell) {
+        totalTimeCell.z = "[h]:mm";
+      }
     } else {
-      sheet = "Sessions";
-      rows = filtered.map((s) => ({
-        Player: s.player.full_name,
-        Table: s.table.name,
-        Game: s.table.game_type,
-        Seated: formatDateTime(s.seated_at),
-        Left: formatDateTime(s.left_at),
-        Duration: formatDuration(sessionMs(s.seated_at, s.left_at)),
-      }));
+      const seatedCell = ws[`D${row}`];
+      const leftCell = ws[`E${row}`];
+      const durationCell = ws[`F${row}`];
+
+      if (seatedCell) {
+        seatedCell.z = "dd.mm.yyyy hh:mm";
+      }
+
+      if (leftCell) {
+        leftCell.z = "dd.mm.yyyy hh:mm";
+      }
+
+      if (durationCell) {
+        durationCell.z = "[h]:mm";
+      }
     }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet);
-    XLSX.writeFile(wb, `reports-${sheet.toLowerCase().replace(/\s+/g, "-")}-${istanbulDate(new Date().toISOString())}.xlsx`);
-  };
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  XLSX.writeFile(
+    wb,
+    `reports-${sheetName
+      .toLowerCase()
+      .replace(/\s+/g, "-")}-${istanbulDate(
+      new Date().toISOString(),
+    )}.xlsx`,
+  );
+};
 
   return (
     <>
