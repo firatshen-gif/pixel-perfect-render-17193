@@ -183,3 +183,65 @@ export function useDeleteSession() {
     onSuccess: inv,
   });
 }
+export function useMovePlayer() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (s: {
+      id: string;
+      player_id: string;
+      current_table_id: string;
+      new_table_id: string;
+      seated_at: string;
+      moved_at: string;
+    }) => {
+      if (s.new_table_id === s.current_table_id) {
+        throw new Error("Choose a different table.");
+      }
+
+      if (new Date(s.moved_at) < new Date(s.seated_at)) {
+        throw new Error("Move time can't be earlier than seated time.");
+      }
+
+      // 1. Close the player's current session.
+      const closeResult = await supabase
+        .from("play_sessions")
+        .update({ left_at: s.moved_at })
+        .eq("id", s.id)
+        .is("left_at", null);
+
+      if (closeResult.error) {
+        throw new Error(closeResult.error.message);
+      }
+
+      // 2. Start a new session at the destination table
+      // using exactly the same timestamp.
+      const insertResult = await supabase
+        .from("play_sessions")
+        .insert({
+          player_id: s.player_id,
+          table_id: s.new_table_id,
+          seated_at: s.moved_at,
+        });
+
+      // If creating the new session fails, restore the old
+      // session so the player doesn't accidentally become unseated.
+      if (insertResult.error) {
+        const rollbackResult = await supabase
+          .from("play_sessions")
+          .update({ left_at: null })
+          .eq("id", s.id);
+
+        if (rollbackResult.error) {
+          throw new Error(
+            `Move failed and the original session could not be restored: ${insertResult.error.message}`,
+          );
+        }
+
+        throw new Error(insertResult.error.message);
+      }
+    },
+
+    onSuccess: inv,
+  });
+}
