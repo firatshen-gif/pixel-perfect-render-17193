@@ -122,7 +122,7 @@ function ReportsPage() {
         }
       />
 
-      <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <div className="space-y-1.5 lg:col-span-2">
           <Label>Player</Label>
           <Combobox value={f.player} onChange={set("player")} placeholder="All players" clearLabel="All players" className="h-11"
@@ -142,15 +142,28 @@ function ReportsPage() {
           <Label htmlFor="date">Date</Label>
           <Input id="date" type="date" value={f.date} onChange={(e) => set("date")(e.target.value)} className="h-11" />
         </div>
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5 lg:col-span-2">
           <Label>Date range</Label>
-          <div className="flex gap-1">
-            <Input type="date" aria-label="From" value={f.from} onChange={(e) => set("from")(e.target.value)} className="h-11 px-2" />
-            <Input type="date" aria-label="To" value={f.to} onChange={(e) => set("to")(e.target.value)} className="h-11 px-2" />
+          <div className="grid grid-cols-2 gap-1">
+            <Input
+              type="date"
+              aria-label="From"
+              value={f.from}
+              onChange={(e) => set("from")(e.target.value)}
+              className="h-11 min-w-0 px-2"
+            />
+
+            <Input
+              type="date"
+              aria-label="To"
+              value={f.to}
+              onChange={(e) => set("to")(e.target.value)}
+              className="h-11 min-w-0 px-2"
+            />
           </div>
         </div>
         {active && (
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-4 xl:col-span-7">
             <Button variant="ghost" size="sm" onClick={() => setF(EMPTY)}>
               <X /> Clear filters
             </Button>
