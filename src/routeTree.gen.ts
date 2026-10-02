@@ -10,33 +10,73 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlayersRouteImport } from './routes/players'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as SessionsRouteImport } from './routes/sessions'
+import { Route as TablesRouteImport } from './routes/tables'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayersRoute = PlayersRouteImport.update({
+  id: '/players',
+  path: '/players',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionsRoute = SessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TablesRoute = TablesRouteImport.update({
+  id: '/tables',
+  path: '/tables',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/players': typeof PlayersRoute
+  '/reports': typeof ReportsRoute
+  '/sessions': typeof SessionsRoute
+  '/tables': typeof TablesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/players': typeof PlayersRoute
+  '/reports': typeof ReportsRoute
+  '/sessions': typeof SessionsRoute
+  '/tables': typeof TablesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/players': typeof PlayersRoute
+  '/reports': typeof ReportsRoute
+  '/sessions': typeof SessionsRoute
+  '/tables': typeof TablesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/players' | '/reports' | '/sessions' | '/tables'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/players' | '/reports' | '/sessions' | '/tables'
+  id: '__root__' | '/' | '/players' | '/reports' | '/sessions' | '/tables'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PlayersRoute: typeof PlayersRoute
+  ReportsRoute: typeof ReportsRoute
+  SessionsRoute: typeof SessionsRoute
+  TablesRoute: typeof TablesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +88,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/players': {
+      id: '/players'
+      path: '/players'
+      fullPath: '/players'
+      preLoaderRoute: typeof PlayersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tables': {
+      id: '/tables'
+      path: '/tables'
+      fullPath: '/tables'
+      preLoaderRoute: typeof TablesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PlayersRoute: PlayersRoute,
+  ReportsRoute: ReportsRoute,
+  SessionsRoute: SessionsRoute,
+  TablesRoute: TablesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

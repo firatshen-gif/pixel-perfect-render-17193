@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { LogOut, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useActiveSessions, useLeaveTable, usePlayers, useSeatPlayer, useTables, type Session } from "@/lib/api";
@@ -110,7 +110,7 @@ function SeatForm() {
     return m;
   }, [active.data]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!playerId) return toast.error("Choose a player");
     if (!tableId) return toast.error("Choose a table");
