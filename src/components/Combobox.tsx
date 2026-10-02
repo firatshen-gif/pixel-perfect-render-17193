@@ -29,7 +29,7 @@ export function Combobox({
   placeholder?: string;
   searchPlaceholder?: string;
   className?: string;
-  clearLabel?: string;
+  ?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -54,16 +54,21 @@ export function Combobox({
           <CommandList>
             <CommandEmpty>No results.</CommandEmpty>
             <CommandGroup>
-              {clearLabel && value && (
+              {clearLabel && (
                 <CommandItem
-                  value="__clear__"
+                  value={`${clearLabel} __clear__`}
                   onSelect={() => {
                     onChange("");
                     setOpen(false);
                   }}
-                  className="py-2.5 text-muted-foreground"
+                  className="py-2.5"
                 >
-                  <X className="h-4 w-4" />
+                  <Check
+                    className={cn(
+                      "h-4 w-4",
+                      !value ? "opacity-100" : "opacity-0"
+                    )}
+                  />
                   <span className="flex-1 truncate">{clearLabel}</span>
                 </CommandItem>
               )}
