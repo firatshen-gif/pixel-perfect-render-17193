@@ -1,14 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { LogOut, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import {
   useActiveSessions,
+  useDeleteSession,
+  useLeaveTable,
   usePlayers,
   useSeatPlayer,
   useTables,
   type PokerTable,
+  type Session,
 } from "@/lib/api";
 
 import {
@@ -61,6 +74,8 @@ function Dashboard() {
   const now = useNow(1000);
 
   const [seatingTable, setSeatingTable] = useState<PokerTable | null>(null);
+  const [leavingSession, setLeavingSession] = useState<Session | null>(null);
+  const [deletingSession, setDeletingSession] = useState<Session | null>(null);
 
   if (tables.isLoading || active.isLoading) {
     return (
@@ -123,30 +138,54 @@ function Dashboard() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {seatedPlayers.map((session) => (
-                        <div
-                          key={session.id}
-                          className="flex items-center justify-between gap-4 rounded-lg bg-muted/50 px-3 py-3"
-                        >
-                          <div className="min-w-0 flex items-center gap-2">
-                            <span className="live-dot shrink-0" />
+{seatedPlayers.map((session) => (
+  <div
+    key={session.id}
+    className="rounded-lg bg-muted/50 px-3 py-3"
+  >
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0 flex items-center gap-2">
+        <span className="live-dot shrink-0" />
 
-                            <span className="truncate font-semibold">
-                              {session.player.full_name}
-                            </span>
-                          </div>
+        <span className="truncate font-semibold">
+          {session.player.full_name}
+        </span>
+      </div>
 
-                          <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-success">
-                            {formatLiveDuration(
-                              sessionMs(
-                                session.seated_at,
-                                null,
-                                now,
-                              ),
-                            )}
-                          </span>
-                        </div>
-                      ))}
+      <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-success">
+        {formatLiveDuration(
+          sessionMs(
+            session.seated_at,
+            null,
+            now,
+          ),
+        )}
+      </span>
+    </div>
+
+    <div className="mt-2 flex justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setLeavingSession(session)}
+      >
+        <LogOut className="h-4 w-4" />
+        Unseat
+      </Button>
+
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-9 w-9 text-destructive hover:text-destructive"
+        title="Delete session"
+        aria-label={`Delete ${session.player.full_name}'s session`}
+        onClick={() => setDeletingSession(session)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  </div>
+))}
                     </div>
                   )}
                 </div>
@@ -172,10 +211,199 @@ function Dashboard() {
         table={seatingTable}
         onClose={() => setSeatingTable(null)}
       />
+      <UnseatDialog
+        session={leavingSession}
+        onClose={() => setLeavingSession(null)}
+      />
+
+      <DeleteSessionDialog
+        session={deletingSession}
+        onClose={() => setDeletingSession(null)}
+      />
     </>
   );
 }
+function UnseatDialog({
+  session,
+  onClose,
+}: {
+  session: Session | null;
+  onClose: () => void;
+}) {
+  const leave = useLeaveTable();
 
+  const [leftAt, setLeftAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <Dialog
+      open={!!session}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        onOpenAutoFocus={() => {
+          setLeftAt(toLocalInput());
+          setError(null);
+        }}
+      >
+        {session && (
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (!leftAt) {
+                setError("Choose an unseat time");
+                return;
+              }
+
+              const iso = fromLocalInput(leftAt);
+
+              leave.mutate(
+                {
+                  id: session.id,
+                  seated_at: session.seated_at,
+                  left_at: iso,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(
+                      `${session.player.full_name} unseated from ${session.table.name}`,
+                    );
+
+                    onClose();
+                  },
+
+                  onError: (err) => {
+                    setError(err.message);
+                  },
+                },
+              );
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Unseat player</DialogTitle>
+
+              <p className="text-sm text-muted-foreground">
+                {session.player.full_name} · {session.table.name}
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <Label htmlFor="dashboard_left_at">
+                Unseat time
+              </Label>
+
+              <Input
+                id="dashboard_left_at"
+                type="datetime-local"
+                value={leftAt}
+                onChange={(event) =>
+                  setLeftAt(event.target.value)
+                }
+                className="h-12 text-base"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm font-medium text-destructive">
+                {error}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="submit"
+                disabled={leave.isPending}
+              >
+                {leave.isPending
+                  ? "Saving…"
+                  : "Confirm Unseat"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteSessionDialog({
+  session,
+  onClose,
+}: {
+  session: Session | null;
+  onClose: () => void;
+}) {
+  const deleteSession = useDeleteSession();
+
+  return (
+    <AlertDialog
+      open={!!session}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete session?
+          </AlertDialogTitle>
+
+          <AlertDialogDescription>
+            {session
+              ? `This will permanently delete ${session.player.full_name}'s current session at ${session.table.name}. Use this only if the seating was created by mistake.`
+              : ""}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            Cancel
+          </AlertDialogCancel>
+
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={deleteSession.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+
+              if (!session) return;
+
+              deleteSession.mutate(session.id, {
+                onSuccess: () => {
+                  toast.success(
+                    `${session.player.full_name}'s session deleted`,
+                  );
+
+                  onClose();
+                },
+
+                onError: (error) => {
+                  toast.error(error.message);
+                },
+              });
+            }}
+          >
+            {deleteSession.isPending
+              ? "Deleting…"
+              : "Delete Session"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 function SeatAtTableDialog({
   table,
   onClose,
