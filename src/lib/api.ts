@@ -167,3 +167,19 @@ export function useLeaveTable() {
     onSuccess: inv,
   });
 }
+
+export function useDeleteSession() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      check(
+        await supabase
+          .from("play_sessions")
+          .delete()
+          .eq("id", id),
+      );
+    },
+    onSuccess: inv,
+  });
+}
