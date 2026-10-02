@@ -54,6 +54,19 @@ export function Combobox({
           <CommandList>
             <CommandEmpty>No results.</CommandEmpty>
             <CommandGroup>
+              {clearLabel && value && (
+                <CommandItem
+                  value="__clear__"
+                  onSelect={() => {
+                    onChange("");
+                    setOpen(false);
+                  }}
+                  className="py-2.5 text-muted-foreground"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="flex-1 truncate">{clearLabel}</span>
+                </CommandItem>
+              )}
               {options.map((o) => (
                 <CommandItem
                   key={o.value}
