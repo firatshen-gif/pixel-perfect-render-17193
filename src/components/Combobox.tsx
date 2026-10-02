@@ -29,7 +29,7 @@ export function Combobox({
   placeholder?: string;
   searchPlaceholder?: string;
   className?: string;
-  ?: string;
+  clearLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
