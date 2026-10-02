@@ -73,7 +73,7 @@ function useInvalidate() {
 export function useSaveTable() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (t: { id?: string; name: string; game_type: string }) => {
+    mutationFn: async (t: { id?: string | undefined; name: string; game_type: string }) => {
       const payload = { name: t.name.trim(), game_type: t.game_type.trim() };
       if (t.id) check(await supabase.from("poker_tables").update(payload).eq("id", t.id));
       else check(await supabase.from("poker_tables").insert(payload));
@@ -104,7 +104,7 @@ export function useDeleteTable() {
 export function useSavePlayer() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: async (p: { id?: string; full_name: string }) => {
+    mutationFn: async (p: { id?: string | undefined; full_name: string }) => {
       const payload = { full_name: p.full_name.trim() };
       if (p.id) check(await supabase.from("players").update(payload).eq("id", p.id));
       else check(await supabase.from("players").insert(payload));

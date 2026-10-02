@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
-export type ComboOption = { value: string; label: string; hint?: string; disabled?: boolean };
+export type ComboOption = { value: string; label: string; hint?: string | undefined; disabled?: boolean | undefined };
 
 export function Combobox({
   options,
@@ -56,7 +56,7 @@ export function Combobox({
                 <CommandItem
                   key={o.value}
                   value={`${o.label} ${o.value}`}
-                  disabled={o.disabled}
+                  disabled={!!o.disabled}
                   onSelect={() => {
                     onChange(o.value);
                     setOpen(false);

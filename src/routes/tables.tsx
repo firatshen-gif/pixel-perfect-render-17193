@@ -116,7 +116,7 @@ function TableDialog({ value, onClose }: { value: Partial<PokerTable> | null; on
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               const parsed = schema.safeParse({ name: fd.get("name"), game_type: fd.get("game_type") });
-              if (!parsed.success) return setError(parsed.error.issues[0].message);
+              if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "Invalid");
               setError(null);
               save.mutate(
                 { id: value.id, ...parsed.data },

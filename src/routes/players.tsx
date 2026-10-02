@@ -127,7 +127,7 @@ function PlayerDialog({ value, onClose }: { value: Partial<Player> | null; onClo
             onSubmit={(e) => {
               e.preventDefault();
               const parsed = schema.safeParse({ full_name: new FormData(e.currentTarget).get("full_name") });
-              if (!parsed.success) return setError(parsed.error.issues[0].message);
+              if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "Invalid");
               setError(null);
               save.mutate(
                 { id: value.id, ...parsed.data },

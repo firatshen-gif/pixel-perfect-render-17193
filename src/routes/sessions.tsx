@@ -112,9 +112,9 @@ function SeatForm() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!playerId) return toast.error("Choose a player");
-    if (!tableId) return toast.error("Choose a table");
-    if (!seatedAt) return toast.error("Choose a seated time");
+    if (!playerId) { toast.error("Choose a player"); return; }
+    if (!tableId) { toast.error("Choose a table"); return; }
+    if (!seatedAt) { toast.error("Choose a seated time"); return; }
     const name = players.data?.find((p) => p.id === playerId)?.full_name;
     const table = tables.data?.find((t) => t.id === tableId)?.name;
     seat.mutate(
