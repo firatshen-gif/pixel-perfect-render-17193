@@ -14,7 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      play_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          left_at: string | null
+          player_id: string
+          seated_at: string
+          table_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          left_at?: string | null
+          player_id: string
+          seated_at: string
+          table_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          left_at?: string | null
+          player_id?: string
+          seated_at?: string
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "play_sessions_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "play_sessions_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "poker_tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      players: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      poker_tables: {
+        Row: {
+          created_at: string
+          game_type: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          game_type: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          game_type?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
