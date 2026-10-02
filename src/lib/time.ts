@@ -29,6 +29,19 @@ export function formatDuration(ms: number) {
   const m = totalMin % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+/** Duration in ms -> "01:42:17" */
+export function formatLiveDuration(ms: number) {
+  if (!isFinite(ms) || ms < 0) ms = 0;
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+}
 
 export function sessionMs(seated: string, left: string | null, now = Date.now()) {
   return (left ? new Date(left).getTime() : now) - new Date(seated).getTime();
