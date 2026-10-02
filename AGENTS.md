@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Data access lives in src/lib/api.ts (React Query hooks over the browser Supabase client); pages never query directly — one place to add auth later.
+- Times are stored as timestamptz and displayed/entered via src/lib/time.ts in Europe/Istanbul — keeps timezone handling consistent.
