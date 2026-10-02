@@ -115,7 +115,7 @@ function ReportsPage() {
       <PageHeader
         title="Reports"
         subtitle={`${filtered.length} completed sessions · ${formatDuration(totalMs)} total play`}
-        actions={
+        action={
           <Button variant="outline" onClick={exportExcel} disabled={!filtered.length}>
             <Download /> Export Excel
           </Button>
