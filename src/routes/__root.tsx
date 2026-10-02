@@ -130,7 +130,7 @@ function RootComponent() {
       <main className="mx-auto max-w-7xl px-4 py-6 md:py-8">
         <Outlet />
       </main>
-      <Toaster richColors position="top-center" />
+      <Toaster richColors position="bottom-right" />
     </QueryClientProvider>
   );
 }
