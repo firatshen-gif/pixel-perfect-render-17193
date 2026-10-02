@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, Download, X } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useCompletedSessions, usePlayers, useTables, type Session } from "@/lib/api";
 import { formatDateTime, formatDuration, istanbulDate, sessionMs } from "@/lib/time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,6 +33,7 @@ function ReportsPage() {
   const tables = useTables();
   const [f, setF] = useState<Filters>(EMPTY);
   const [detail, setDetail] = useState<string | null>(null);
+  const [tab, setTab] = useState("sessions");
 
   const games = useMemo(
     () => Array.from(new Set((tables.data ?? []).map((t) => t.game_type))).sort(),
@@ -81,27 +83,59 @@ function ReportsPage() {
   const set = (k: keyof Filters) => (v: string) => setF((p) => ({ ...p, [k]: v }));
   const active = Object.values(f).some(Boolean);
 
+  const exportExcel = () => {
+    let rows: Record<string, string | number>[];
+    let sheet: string;
+    if (tab === "players") {
+      sheet = "By player";
+      rows = playerSummary.map((r) => ({ Player: r.name, "Total time": formatDuration(r.ms), Sessions: r.n }));
+    } else if (tab === "tables") {
+      sheet = "By table";
+      rows = tableSummary.map((r) => ({
+        Table: r.name, Game: r.game, "Total time": formatDuration(r.ms), Sessions: r.n, "Unique players": r.players.size,
+      }));
+    } else {
+      sheet = "Sessions";
+      rows = filtered.map((s) => ({
+        Player: s.player.full_name,
+        Table: s.table.name,
+        Game: s.table.game_type,
+        Seated: formatDateTime(s.seated_at),
+        Left: formatDateTime(s.left_at),
+        Duration: formatDuration(sessionMs(s.seated_at, s.left_at)),
+      }));
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet);
+    XLSX.writeFile(wb, `reports-${sheet.toLowerCase().replace(/\s+/g, "-")}-${istanbulDate(new Date().toISOString())}.xlsx`);
+  };
+
   return (
     <>
       <PageHeader
         title="Reports"
         subtitle={`${filtered.length} completed sessions · ${formatDuration(totalMs)} total play`}
+        actions={
+          <Button variant="outline" onClick={exportExcel} disabled={!filtered.length}>
+            <Download /> Export Excel
+          </Button>
+        }
       />
 
       <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-6">
         <div className="space-y-1.5 lg:col-span-2">
           <Label>Player</Label>
-          <Combobox value={f.player} onChange={set("player")} placeholder="All players" className="h-11"
+          <Combobox value={f.player} onChange={set("player")} placeholder="All players" clearLabel="All players" className="h-11"
             options={(players.data ?? []).map((p) => ({ value: p.id, label: p.full_name }))} />
         </div>
         <div className="space-y-1.5">
           <Label>Table</Label>
-          <Combobox value={f.table} onChange={set("table")} placeholder="All tables" className="h-11"
+          <Combobox value={f.table} onChange={set("table")} placeholder="All tables" clearLabel="All tables" className="h-11"
             options={(tables.data ?? []).map((t) => ({ value: t.id, label: t.name }))} />
         </div>
         <div className="space-y-1.5">
           <Label>Game type</Label>
-          <Combobox value={f.game} onChange={set("game")} placeholder="All games" className="h-11"
+          <Combobox value={f.game} onChange={set("game")} placeholder="All games" clearLabel="All games" className="h-11"
             options={games.map((g) => ({ value: g, label: g }))} />
         </div>
         <div className="space-y-1.5">
@@ -127,7 +161,7 @@ function ReportsPage() {
       {sessions.isLoading ? (
         <Loading />
       ) : (
-        <Tabs defaultValue="sessions">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-4 h-11">
             <TabsTrigger value="sessions" className="px-4">Sessions</TabsTrigger>
             <TabsTrigger value="players" className="px-4">By player</TabsTrigger>

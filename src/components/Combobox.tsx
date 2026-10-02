@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -21,6 +21,7 @@ export function Combobox({
   placeholder = "Select…",
   searchPlaceholder = "Search…",
   className,
+  clearLabel,
 }: {
   options: ComboOption[];
   value: string;
@@ -28,6 +29,7 @@ export function Combobox({
   placeholder?: string;
   searchPlaceholder?: string;
   className?: string;
+  clearLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -52,6 +54,19 @@ export function Combobox({
           <CommandList>
             <CommandEmpty>No results.</CommandEmpty>
             <CommandGroup>
+              {clearLabel && value && (
+                <CommandItem
+                  value="__clear__"
+                  onSelect={() => {
+                    onChange("");
+                    setOpen(false);
+                  }}
+                  className="py-2.5 text-muted-foreground"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="flex-1 truncate">{clearLabel}</span>
+                </CommandItem>
+              )}
               {options.map((o) => (
                 <CommandItem
                   key={o.value}
