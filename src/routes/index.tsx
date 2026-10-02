@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { LogOut, Plus, Trash2 } from "lucide-react";
+import { ArrowRightLeft, LogOut, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -17,6 +17,7 @@ import {
   useActiveSessions,
   useDeleteSession,
   useLeaveTable,
+  useMovePlayer,
   usePlayers,
   useSeatPlayer,
   useTables,
@@ -76,6 +77,7 @@ function Dashboard() {
   const [seatingTable, setSeatingTable] = useState<PokerTable | null>(null);
   const [leavingSession, setLeavingSession] = useState<Session | null>(null);
   const [deletingSession, setDeletingSession] = useState<Session | null>(null);
+  const [movingSession, setMovingSession] = useState<Session | null>(null);
 
   if (tables.isLoading || active.isLoading) {
     return (
@@ -163,27 +165,36 @@ function Dashboard() {
       </span>
     </div>
 
-    <div className="mt-2 flex justify-end gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setLeavingSession(session)}
-      >
-        <LogOut className="h-4 w-4" />
-        Unseat
-      </Button>
+<div className="mt-2 flex justify-end gap-2">
+  <Button
+    size="sm"
+    variant="outline"
+    onClick={() => setMovingSession(session)}
+  >
+    <ArrowRightLeft className="h-4 w-4" />
+    Move
+  </Button>
 
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-9 w-9 text-destructive hover:text-destructive"
-        title="Delete session"
-        aria-label={`Delete ${session.player.full_name}'s session`}
-        onClick={() => setDeletingSession(session)}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </div>
+  <Button
+    size="sm"
+    variant="outline"
+    onClick={() => setLeavingSession(session)}
+  >
+    <LogOut className="h-4 w-4" />
+    Unseat
+  </Button>
+
+  <Button
+    size="icon"
+    variant="ghost"
+    className="h-9 w-9 text-destructive hover:text-destructive"
+    title="Delete session"
+    aria-label={`Delete ${session.player.full_name}'s session`}
+    onClick={() => setDeletingSession(session)}
+  >
+    <Trash2 className="h-4 w-4" />
+  </Button>
+</div>
   </div>
 ))}
                     </div>
@@ -211,6 +222,10 @@ function Dashboard() {
         table={seatingTable}
         onClose={() => setSeatingTable(null)}
       />
+      <MovePlayerDialog
+        session={movingSession}
+        onClose={() => setMovingSession(null)}
+      />
       <UnseatDialog
         session={leavingSession}
         onClose={() => setLeavingSession(null)}
@@ -221,6 +236,156 @@ function Dashboard() {
         onClose={() => setDeletingSession(null)}
       />
     </>
+  );
+}
+function MovePlayerDialog({
+  session,
+  onClose,
+}: {
+  session: Session | null;
+  onClose: () => void;
+}) {
+  const tables = useTables();
+  const movePlayer = useMovePlayer();
+
+  const [newTableId, setNewTableId] = useState("");
+  const [movedAt, setMovedAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const tableOptions = (tables.data ?? [])
+    .filter((table) => table.id !== session?.table.id)
+    .map((table) => ({
+      value: table.id,
+      label: table.name,
+      hint: table.game_type,
+    }));
+
+  return (
+    <Dialog
+      open={!!session}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        onOpenAutoFocus={() => {
+          setNewTableId("");
+          setMovedAt(toLocalInput());
+          setError(null);
+        }}
+      >
+        {session && (
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (!newTableId) {
+                setError("Choose a destination table");
+                return;
+              }
+
+              if (!movedAt) {
+                setError("Choose a move time");
+                return;
+              }
+
+              const destinationTable = tables.data?.find(
+                (table) => table.id === newTableId,
+              );
+
+              movePlayer.mutate(
+                {
+                  id: session.id,
+                  player_id: session.player.id,
+                  current_table_id: session.table.id,
+                  new_table_id: newTableId,
+                  seated_at: session.seated_at,
+                  moved_at: fromLocalInput(movedAt),
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(
+                      `${session.player.full_name} moved to ${
+                        destinationTable?.name ?? "new table"
+                      }`,
+                    );
+
+                    onClose();
+                  },
+
+                  onError: (err) => {
+                    setError(err.message);
+                  },
+                },
+              );
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Move player</DialogTitle>
+
+              <p className="text-sm text-muted-foreground">
+                {session.player.full_name} · Currently at{" "}
+                {session.table.name}
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <Label>Move to</Label>
+
+              <Combobox
+                value={newTableId}
+                onChange={setNewTableId}
+                placeholder="Choose table…"
+                searchPlaceholder="Search tables…"
+                options={tableOptions}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dashboard_moved_at">
+                Move time
+              </Label>
+
+              <Input
+                id="dashboard_moved_at"
+                type="datetime-local"
+                value={movedAt}
+                onChange={(event) =>
+                  setMovedAt(event.target.value)
+                }
+                className="h-12 text-base"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm font-medium text-destructive">
+                {error}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="submit"
+                disabled={movePlayer.isPending}
+              >
+                {movePlayer.isPending
+                  ? "Moving…"
+                  : "Move Player"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 function UnseatDialog({
