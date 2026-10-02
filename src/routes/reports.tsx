@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, Download, X } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useCompletedSessions, usePlayers, useTables, type Session } from "@/lib/api";
 import { formatDateTime, formatDuration, istanbulDate, sessionMs } from "@/lib/time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
