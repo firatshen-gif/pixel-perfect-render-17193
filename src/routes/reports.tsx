@@ -33,6 +33,7 @@ function ReportsPage() {
   const tables = useTables();
   const [f, setF] = useState<Filters>(EMPTY);
   const [detail, setDetail] = useState<string | null>(null);
+  const [tab, setTab] = useState("sessions");
 
   const games = useMemo(
     () => Array.from(new Set((tables.data ?? []).map((t) => t.game_type))).sort(),
@@ -81,6 +82,33 @@ function ReportsPage() {
   const totalMs = filtered.reduce((a, s) => a + sessionMs(s.seated_at, s.left_at), 0);
   const set = (k: keyof Filters) => (v: string) => setF((p) => ({ ...p, [k]: v }));
   const active = Object.values(f).some(Boolean);
+
+  const exportExcel = () => {
+    let rows: Record<string, string | number>[];
+    let sheet: string;
+    if (tab === "players") {
+      sheet = "By player";
+      rows = playerSummary.map((r) => ({ Player: r.name, "Total time": formatDuration(r.ms), Sessions: r.n }));
+    } else if (tab === "tables") {
+      sheet = "By table";
+      rows = tableSummary.map((r) => ({
+        Table: r.name, Game: r.game, "Total time": formatDuration(r.ms), Sessions: r.n, "Unique players": r.players.size,
+      }));
+    } else {
+      sheet = "Sessions";
+      rows = filtered.map((s) => ({
+        Player: s.player.full_name,
+        Table: s.table.name,
+        Game: s.table.game_type,
+        Seated: formatDateTime(s.seated_at),
+        Left: formatDateTime(s.left_at),
+        Duration: formatDuration(sessionMs(s.seated_at, s.left_at)),
+      }));
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheet);
+    XLSX.writeFile(wb, `reports-${sheet.toLowerCase().replace(/\s+/g, "-")}-${istanbulDate(new Date().toISOString())}.xlsx`);
+  };
 
   return (
     <>
