@@ -1,8 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ChevronRight, Download, X } from "lucide-react";
+import { ChevronRight, Download, Trash2, X } from "lucide-react";
 import * as XLSX from "xlsx";
-import { useCompletedSessions, usePlayers, useTables, type Session } from "@/lib/api";
+import {
+  useCompletedSessions,
+  useDeleteSession,
+  usePlayers,
+  useTables,
+  type Session,
+} from "@/lib/api";
 import { formatDateTime, formatDuration, istanbulDate, sessionMs } from "@/lib/time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -11,6 +17,17 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/Combobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, Loading, PageHeader } from "@/components/ui-bits";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -34,6 +51,7 @@ function ReportsPage() {
   const [f, setF] = useState<Filters>(EMPTY);
   const [detail, setDetail] = useState<string | null>(null);
   const [tab, setTab] = useState("sessions");
+  const [deletingSession, setDeletingSession] = useState<Session | null>(null);
 
   const games = useMemo(
     () => Array.from(new Set((tables.data ?? []).map((t) => t.game_type))).sort(),
@@ -182,7 +200,10 @@ function ReportsPage() {
           </TabsList>
 
           <TabsContent value="sessions">
-            <SessionTable sessions={filtered} />
+            <SessionTable
+              sessions={filtered}
+              onDelete={setDeletingSession}
+            />
           </TabsContent>
 
           <TabsContent value="players">
@@ -249,15 +270,96 @@ function ReportsPage() {
             <DialogTitle>{playerSummary.find((p) => p.id === detail)?.name} — sessions</DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
-            <SessionTable sessions={filtered.filter((s) => s.player.id === detail)} hidePlayer />
+            <SessionTable
+              sessions={filtered.filter((s) => s.player.id === detail)}
+              hidePlayer
+              onDelete={setDeletingSession}
+            />
           </div>
         </DialogContent>
       </Dialog>
+      <DeleteReportSessionDialog
+  session={deletingSession}
+  onClose={() => setDeletingSession(null)}
+/>
     </>
   );
 }
+function DeleteReportSessionDialog({
+  session,
+  onClose,
+}: {
+  session: Session | null;
+  onClose: () => void;
+}) {
+  const deleteSession = useDeleteSession();
 
-function SessionTable({ sessions, hidePlayer }: { sessions: Session[]; hidePlayer?: boolean }) {
+  return (
+    <AlertDialog
+      open={!!session}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete session?
+          </AlertDialogTitle>
+
+          <AlertDialogDescription>
+            {session
+              ? `This will permanently delete ${session.player.full_name}'s session at ${session.table.name}. This action cannot be undone.`
+              : ""}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            Cancel
+          </AlertDialogCancel>
+
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={deleteSession.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+
+              if (!session) return;
+
+              deleteSession.mutate(session.id, {
+                onSuccess: () => {
+                  toast.success(
+                    `${session.player.full_name}'s session deleted`,
+                  );
+
+                  onClose();
+                },
+
+                onError: (error) => {
+                  toast.error(error.message);
+                },
+              });
+            }}
+          >
+            {deleteSession.isPending
+              ? "Deleting…"
+              : "Delete Session"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+function SessionTable({
+  sessions,
+  hidePlayer,
+  onDelete,
+}: {
+  sessions: Session[];
+  hidePlayer?: boolean;
+  onDelete: (session: Session) => void;
+}) {
   if (!sessions.length) return <Empty>No completed sessions match these filters.</Empty>;
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
@@ -270,6 +372,7 @@ function SessionTable({ sessions, hidePlayer }: { sessions: Session[]; hidePlaye
             <th className="px-4 py-3">Seated</th>
             <th className="px-4 py-3">Left</th>
             <th className="px-4 py-3 text-right">Duration</th>
+            <th className="w-12 px-2 py-3" />
           </tr>
         </thead>
         <tbody>
@@ -281,6 +384,18 @@ function SessionTable({ sessions, hidePlayer }: { sessions: Session[]; hidePlaye
               <td className="whitespace-nowrap px-4 py-3 tabular">{formatDateTime(s.seated_at)}</td>
               <td className="whitespace-nowrap px-4 py-3 tabular">{formatDateTime(s.left_at)}</td>
               <td className="px-4 py-3 text-right font-semibold tabular">{formatDuration(sessionMs(s.seated_at, s.left_at))}</td>
+              <td className="px-2 py-3 text-right">
+  <Button
+    size="icon"
+    variant="ghost"
+    className="h-8 w-8 text-destructive hover:text-destructive"
+    title="Delete session"
+    aria-label={`Delete ${s.player.full_name}'s session`}
+    onClick={() => onDelete(s)}
+  >
+    <Trash2 className="h-4 w-4" />
+  </Button>
+</td>
             </tr>
           ))}
         </tbody>
