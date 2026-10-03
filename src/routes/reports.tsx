@@ -9,7 +9,13 @@ import {
   useTables,
   type Session,
 } from "@/lib/api";
-import { formatDateTime, formatDuration, istanbulDate, sessionMs } from "@/lib/time";
+import {
+  formatDateTime,
+  formatDuration,
+  istanbulDate,
+  sessionMs,
+  toLocalInput,
+} from "@/lib/time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,16 +51,34 @@ type Filters = { player: string; table: string; game: string; date: string; from
 const EMPTY: Filters = { player: "", table: "", game: "", date: "", from: "", to: "" };
 const EXCEL_EPOCH_DAYS = 25569;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const ISTANBUL_OFFSET_DAYS = 3 / 24;
 
-function excelIstanbulDate(iso: string | null) {
+function excelCyprusDate(iso: string | null) {
   if (!iso) return "";
 
-  return (
-    new Date(iso).getTime() / MS_PER_DAY +
-    EXCEL_EPOCH_DAYS +
-    ISTANBUL_OFFSET_DAYS
+  const local = toLocalInput(new Date(iso));
+  const [datePart, timePart] = local.split("T");
+
+  const [year, month, day] = datePart
+    .split("-")
+    .map(Number);
+
+  const [hour, minute] = timePart
+    .split(":")
+    .map(Number);
+
+  const localAsUtc = Date.UTC(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
   );
+
+  return localAsUtc / MS_PER_DAY + EXCEL_EPOCH_DAYS;
+}
+
+function excelDuration(ms: number) {
+  return ms / MS_PER_DAY;
 }
 
 function excelDuration(ms: number) {
@@ -147,8 +171,8 @@ const exportExcel = () => {
       Player: s.player.full_name,
       Table: s.table.name,
       Game: s.table.game_type,
-      Seated: excelIstanbulDate(s.seated_at),
-      Left: excelIstanbulDate(s.left_at),
+      Seated: excelCyprusDate(s.seated_at),
+      Left: excelCyprusDate(s.left_at),
       Duration: excelDuration(
         sessionMs(s.seated_at, s.left_at),
       ),
