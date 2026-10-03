@@ -55,6 +55,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -118,6 +124,10 @@ function Dashboard() {
             const seatedPlayers = (active.data ?? []).filter(
               (session) => session.table.id === table.id,
             );
+            const sittingOutCount = seatedPlayers.filter((session) =>
+              session.sitouts.some((sitout) => !sitout.sat_in_at),
+            ).length;
+            const sittingInCount = seatedPlayers.length - sittingOutCount;
 
             return (
               <div
@@ -147,10 +157,54 @@ function Dashboard() {
   </div>
 </div>
 
-                    <div className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-                      {seatedPlayers.length}{" "}
-                      {seatedPlayers.length === 1 ? "player" : "players"}
-                    </div>
+                    <TooltipProvider delayDuration={250}>
+                      <div
+                        className="flex shrink-0 items-center gap-1.5"
+                        aria-label={`${seatedPlayers.length} seated, ${sittingInCount} sitting in, ${sittingOutCount} sitting out`}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="flex h-7 min-w-7 items-center justify-center rounded-full bg-muted px-2 text-xs font-bold text-muted-foreground"
+                              tabIndex={0}
+                            >
+                              {seatedPlayers.length}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            All seated players
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="flex h-7 min-w-7 items-center justify-center rounded-full bg-emerald-500/20 px-2 text-xs font-bold text-emerald-700 dark:text-emerald-300"
+                              tabIndex={0}
+                            >
+                              {sittingInCount}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Players sitting in
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-400/25 px-2 text-xs font-bold text-amber-700 dark:text-amber-300"
+                              tabIndex={0}
+                            >
+                              {sittingOutCount}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Players sitting out
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
                   </div>
                 </div>
 
