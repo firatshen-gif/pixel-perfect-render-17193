@@ -224,91 +224,130 @@ function Dashboard() {
   return (
     <div
       key={session.id}
-      className="rounded-lg bg-muted/50 px-3 py-3"
+      className="rounded-lg bg-muted/50 px-2.5 py-2"
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 flex items-center gap-2">
-          <span className={openSitout ? "h-2 w-2 shrink-0 rounded-full bg-muted-foreground" : "live-dot shrink-0"} />
+      <TooltipProvider delayDuration={200}>
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            {openSitout ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 ring-1 ring-amber-500/40"
+                    tabIndex={0}
+                    aria-label={`Sitting out for ${formatLiveDuration(
+                      now - new Date(openSitout.sat_out_at).getTime(),
+                    )}`}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Sitting out for{" "}
+                  {formatLiveDuration(
+                    now - new Date(openSitout.sat_out_at).getTime(),
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="live-dot shrink-0" />
+            )}
 
-          <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 
-          <span className="truncate font-semibold">
-            {session.player.full_name}
-          </span>
-        </div>
+            <span className="truncate text-sm font-semibold">
+              {session.player.full_name}
+            </span>
+          </div>
 
-        <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-success">
-          {formatLiveDuration(
-            sessionMs(
-              session.seated_at,
-              null,
-              now,
-            ),
-          )}
-        </span>
-      </div>
-
-      {openSitout && (
-        <div className="mt-2 flex items-center justify-between rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground">
-          <span className="font-medium">Sitting out</span>
-          <span className="font-mono font-semibold tabular-nums">
+          <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-success">
             {formatLiveDuration(
-              now - new Date(openSitout.sat_out_at).getTime(),
+              sessionMs(
+                session.seated_at,
+                null,
+                now,
+              ),
             )}
           </span>
+
+          <div className="flex shrink-0 items-center gap-1">
+            {openSitout ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    aria-label={`Sit ${session.player.full_name} in`}
+                    onClick={() => setSittingInSession(session)}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Sit In</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    aria-label={`Sit ${session.player.full_name} out`}
+                    onClick={() => setSittingOutSession(session)}
+                  >
+                    <Pause className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Sit Out</TooltipContent>
+              </Tooltip>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label={`Move ${session.player.full_name}`}
+                  onClick={() => setMovingSession(session)}
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Move</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label={`Unseat ${session.player.full_name}`}
+                  onClick={() => setLeavingSession(session)}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Unseat</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  aria-label={`Delete ${session.player.full_name}'s session`}
+                  onClick={() => setDeletingSession(session)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Delete session</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
-      )}
-
-      <div className="mt-2 flex flex-wrap justify-end gap-2">
-        {openSitout ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setSittingInSession(session)}
-          >
-            <Play className="h-4 w-4" />
-            Sit In
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setSittingOutSession(session)}
-          >
-            <Pause className="h-4 w-4" />
-            Sit Out
-          </Button>
-        )}
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setMovingSession(session)}
-        >
-          <ArrowRightLeft className="h-4 w-4" />
-          Move
-        </Button>
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setLeavingSession(session)}
-        >
-          <LogOut className="h-4 w-4" />
-          Unseat
-        </Button>
-
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-9 w-9 text-destructive hover:text-destructive"
-          title="Delete session"
-          aria-label={`Delete ${session.player.full_name}'s session`}
-          onClick={() => setDeletingSession(session)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+      </TooltipProvider>
     </div>
   );
 })}
