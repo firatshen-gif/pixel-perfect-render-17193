@@ -229,8 +229,6 @@ function Dashboard() {
         <Button
           size="sm"
           variant="outline"
-          disabled={!!openSitout}
-          title={openSitout ? "Sit the player back in before moving tables" : undefined}
           onClick={() => setMovingSession(session)}
         >
           <ArrowRightLeft className="h-4 w-4" />
@@ -376,10 +374,18 @@ function MovePlayerDialog({
                 },
                 {
                   onSuccess: () => {
+                    const isSittingOut = session.sitouts.some(
+                      (sitout) => !sitout.sat_in_at,
+                    );
+
                     toast.success(
-                      `${session.player.full_name} moved to ${
-                        destinationTable?.name ?? "new table"
-                      }`,
+                      isSittingOut
+                        ? `${session.player.full_name} moved to ${
+                            destinationTable?.name ?? "new table"
+                          } and remains sitting out`
+                        : `${session.player.full_name} moved to ${
+                            destinationTable?.name ?? "new table"
+                          }`,
                     );
 
                     onClose();
@@ -399,6 +405,12 @@ function MovePlayerDialog({
                 {session.player.full_name} · Currently at{" "}
                 {session.table.name}
               </p>
+
+              {session.sitouts.some((sitout) => !sitout.sat_in_at) && (
+                <p className="text-sm font-medium text-muted-foreground">
+                  This player is sitting out and will remain sitting out after the move.
+                </p>
+              )}
             </DialogHeader>
 
             <div className="space-y-2">
