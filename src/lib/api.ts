@@ -28,6 +28,7 @@ export type Session = {
   id: string;
   seated_at: string;
   left_at: string | null;
+  seat_number: number | null;
   player: { id: string; full_name: string };
   table: { id: string; name: string; game_type: string };
   sitouts: SessionSitout[];
@@ -45,6 +46,7 @@ type RawSession = {
   id: string;
   seated_at: string;
   left_at: string | null;
+  seat_number: number | null;
   player: { id: string; full_name: string };
   table: {
     id: string;
@@ -59,7 +61,7 @@ const TABLE_SELECT =
   "id, name, created_at, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name, is_default)";
 
 const SESSION_SELECT =
-  "id, seated_at, left_at, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name)), sitouts:session_sitouts(id, sat_out_at, sat_in_at)";
+  "id, seated_at, left_at, seat_number, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name)), sitouts:session_sitouts(id, sat_out_at, sat_in_at)";
 
 function normalizeTable(table: RawPokerTable): PokerTable {
   return {
@@ -76,6 +78,7 @@ function normalizeSession(session: RawSession): Session {
     id: session.id,
     seated_at: session.seated_at,
     left_at: session.left_at,
+    seat_number: session.seat_number,
     player: session.player,
     table: {
       id: session.table.id,
@@ -385,8 +388,18 @@ export function useDeletePlayer() {
 // ---------- Sessions ----------
 export function useSeatPlayer() {
   const inv = useInvalidate();
+
   return useMutation({
-    mutationFn: async (s: { player_id: string; table_id: string; seated_at: string }) => {
+    mutationFn: async (s: {
+      player_id: string;
+      table_id: string;
+      seat_number: number;
+      seated_at: string;
+    }) => {
+      if (s.seat_number < 1 || s.seat_number > 12) {
+        throw new Error("Seat number must be between 1 and 12.");
+      }
+
       const existing = check(
         await supabase
           .from("play_sessions")
@@ -395,11 +408,34 @@ export function useSeatPlayer() {
           .is("left_at", null)
           .maybeSingle(),
       ) as { table: { name: string } | null } | null;
-      if (existing)
-        throw new Error(`This player is already seated at ${existing.table?.name ?? "a table"}.`);
+
+      if (existing) {
+        throw new Error(
+          `This player is already seated at ${existing.table?.name ?? "a table"}.`,
+        );
+      }
+
+      const occupiedSeat = check(
+        await supabase
+          .from("play_sessions")
+          .select("id")
+          .eq("table_id", s.table_id)
+          .eq("seat_number", s.seat_number)
+          .is("left_at", null)
+          .maybeSingle(),
+      ) as { id: string } | null;
+
+      if (occupiedSeat) {
+        throw new Error(`Seat #${s.seat_number} is already occupied.`);
+      }
+
       const res = await supabase.from("play_sessions").insert(s);
+
       if (res.error) {
-        if (res.error.code === "23505") throw new Error("This player is already seated.");
+        if (res.error.code === "23505") {
+          throw new Error("This player or seat is no longer available.");
+        }
+
         throw new Error(res.error.message);
       }
     },
@@ -589,12 +625,55 @@ export function useMovePlayer() {
       id: string;
       player_id: string;
       current_table_id: string;
+      current_seat_number: number | null;
       new_table_id: string;
+      new_seat_number: number;
       seated_at: string;
       moved_at: string;
     }) => {
+      if (s.new_seat_number < 1 || s.new_seat_number > 12) {
+        throw new Error("Seat number must be between 1 and 12.");
+      }
+
+      if (
+        s.new_table_id === s.current_table_id &&
+        s.new_seat_number === s.current_seat_number
+      ) {
+        throw new Error("Choose a different seat or table.");
+      }
+
+      const occupiedSeat = check(
+        await supabase
+          .from("play_sessions")
+          .select("id")
+          .eq("table_id", s.new_table_id)
+          .eq("seat_number", s.new_seat_number)
+          .is("left_at", null)
+          .neq("id", s.id)
+          .maybeSingle(),
+      ) as { id: string } | null;
+
+      if (occupiedSeat) {
+        throw new Error(`Seat #${s.new_seat_number} is already occupied.`);
+      }
+
+      // A seat change within the same table does not create a new session.
       if (s.new_table_id === s.current_table_id) {
-        throw new Error("Choose a different table.");
+        const changeSeat = await supabase
+          .from("play_sessions")
+          .update({ seat_number: s.new_seat_number })
+          .eq("id", s.id)
+          .is("left_at", null);
+
+        if (changeSeat.error) {
+          if (changeSeat.error.code === "23505") {
+            throw new Error(`Seat #${s.new_seat_number} is already occupied.`);
+          }
+
+          throw new Error(changeSeat.error.message);
+        }
+
+        return;
       }
 
       if (new Date(s.moved_at) < new Date(s.seated_at)) {
@@ -614,7 +693,6 @@ export function useMovePlayer() {
         throw new Error("Move time can't be earlier than the current sit-out time.");
       }
 
-      // If the player is sitting out, close that interval at the move time.
       if (openSitout) {
         check(
           await supabase
@@ -624,7 +702,6 @@ export function useMovePlayer() {
         );
       }
 
-      // Close the player's current session at the move time.
       const closeResult = await supabase
         .from("play_sessions")
         .update({ left_at: s.moved_at })
@@ -642,12 +719,12 @@ export function useMovePlayer() {
         throw new Error(closeResult.error.message);
       }
 
-      // Start the destination session at exactly the same timestamp.
       const insertResult = await supabase
         .from("play_sessions")
         .insert({
           player_id: s.player_id,
           table_id: s.new_table_id,
+          seat_number: s.new_seat_number,
           seated_at: s.moved_at,
         })
         .select("id")
@@ -678,12 +755,15 @@ export function useMovePlayer() {
           );
         }
 
+        if (insertResult.error?.code === "23505") {
+          throw new Error(`Seat #${s.new_seat_number} is already occupied.`);
+        }
+
         throw new Error(
           insertResult.error?.message ?? "Could not create destination session.",
         );
       }
 
-      // Preserve the sit-out state across the table move.
       if (openSitout) {
         const newSitoutResult = await supabase
           .from("session_sitouts")
@@ -693,7 +773,6 @@ export function useMovePlayer() {
           });
 
         if (newSitoutResult.error) {
-          // Roll back the destination session and restore the original state.
           const deleteNewSession = await supabase
             .from("play_sessions")
             .delete()
