@@ -77,6 +77,7 @@ function SessionsPage() {
                 <div className="truncate text-lg font-bold">{s.player.full_name}</div>
                 <div className="text-sm text-muted-foreground">
                   {s.table.name} · {s.table.game_type}
+                  {s.seat_number ? ` · Seat #${s.seat_number}` : " · Seat unassigned"}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground tabular">
                   Since {formatDateTime(s.seated_at)} ·{" "}
@@ -102,6 +103,7 @@ function SeatForm() {
   const seat = useSeatPlayer();
   const [playerId, setPlayerId] = useState("");
   const [tableId, setTableId] = useState("");
+  const [seatNumber, setSeatNumber] = useState("");
   const [seatedAt, setSeatedAt] = useState(() => toLocalInput());
 
   const seatedMap = useMemo(() => {
@@ -110,19 +112,40 @@ function SeatForm() {
     return m;
   }, [active.data]);
 
+  const occupiedSeats = useMemo(
+    () =>
+      new Set(
+        (active.data ?? [])
+          .filter(
+            (session) =>
+              session.table.id === tableId &&
+              session.seat_number != null,
+          )
+          .map((session) => session.seat_number as number),
+      ),
+    [active.data, tableId],
+  );
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!playerId) { toast.error("Choose a player"); return; }
     if (!tableId) { toast.error("Choose a table"); return; }
+    if (!seatNumber) { toast.error("Choose a seat"); return; }
     if (!seatedAt) { toast.error("Choose a seated time"); return; }
     const name = players.data?.find((p) => p.id === playerId)?.full_name;
     const table = tables.data?.find((t) => t.id === tableId)?.name;
     seat.mutate(
-      { player_id: playerId, table_id: tableId, seated_at: fromLocalInput(seatedAt) },
+      {
+        player_id: playerId,
+        table_id: tableId,
+        seat_number: Number(seatNumber),
+        seated_at: fromLocalInput(seatedAt),
+      },
       {
         onSuccess: () => {
-          toast.success(`${name} seated at ${table}`);
+          toast.success(`${name} seated at ${table} · Seat #${seatNumber}`);
           setPlayerId("");
+          setSeatNumber("");
           setSeatedAt(toLocalInput());
         },
         onError: (err) => toast.error(err.message),
@@ -132,7 +155,7 @@ function SeatForm() {
 
   return (
     <form onSubmit={submit} className="rounded-xl bg-felt p-5 text-felt-foreground shadow-lg md:p-6">
-      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr_1fr_auto] md:items-end">
+      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr_.7fr_1fr_auto] md:items-end">
         <div className="space-y-2">
           <Label>Player</Label>
           <Combobox
@@ -152,10 +175,39 @@ function SeatForm() {
           <Combobox
             className="bg-card text-card-foreground"
             value={tableId}
-            onChange={setTableId}
+            onChange={(value) => {
+              setTableId(value);
+              setSeatNumber("");
+            }}
             placeholder="Choose table…"
             options={(tables.data ?? []).map((t) => ({ value: t.id, label: t.name, hint: t.game_type }))}
           />
+        </div>
+        <div className="space-y-2">
+          <Label>Seat</Label>
+          <Select
+            value={seatNumber}
+            onValueChange={setSeatNumber}
+            disabled={!tableId}
+          >
+            <SelectTrigger className="h-12 bg-card text-card-foreground">
+              <SelectValue placeholder="Seat…" />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                (number) => (
+                  <SelectItem
+                    key={number}
+                    value={String(number)}
+                    disabled={occupiedSeats.has(number)}
+                  >
+                    #{number}
+                    {occupiedSeats.has(number) ? " · Occupied" : ""}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="seated_at">Seated at</Label>
@@ -224,6 +276,8 @@ function LeaveDialog({ session, onClose }: { session: Session | null; onClose: (
               <dd className="font-semibold">{session.player.full_name}</dd>
               <dt className="text-muted-foreground">Table</dt>
               <dd>{session.table.name}</dd>
+              <dt className="text-muted-foreground">Seat</dt>
+              <dd>{session.seat_number ? `#${session.seat_number}` : "Unassigned"}</dd>
               <dt className="text-muted-foreground">Seated at</dt>
               <dd className="tabular">{formatDateTime(session.seated_at)}</dd>
             </dl>
