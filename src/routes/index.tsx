@@ -401,20 +401,6 @@ function Dashboard() {
                   )}
                 </div>
 
-                {/* Seat player */}
-                <div className="border-t p-4">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setSeatingTable(table);
-                      setSeatingSeatNumber(null);
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Seat Player
-                  </Button>
-                </div>
               </div>
             );
           })}
@@ -500,7 +486,7 @@ function MovePlayerDialog({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setNewTableId(session?.table.id ?? "");
+          setNewTableId("");
           setNewSeatNumber("");
           setMovedAt(toLocalInput());
           setError(null);
@@ -590,7 +576,7 @@ function MovePlayerDialog({
             </DialogHeader>
 
             <div className="space-y-2">
-              <Label>Table</Label>
+              <Label>Destination table</Label>
 
               <Combobox
                 value={newTableId}
@@ -606,10 +592,11 @@ function MovePlayerDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Seat</Label>
+              <Label>Destination seat</Label>
 
               <Select
                 value={newSeatNumber}
+                disabled={!newTableId}
                 onValueChange={(value) => {
                   setNewSeatNumber(value);
                   setError(null);
@@ -1060,7 +1047,6 @@ function SeatAtTableDialog({
   const seat = useSeatPlayer();
 
   const [playerId, setPlayerId] = useState("");
-  const [seatNumber, setSeatNumber] = useState("");
   const [seatedAt, setSeatedAt] = useState(() => toLocalInput());
 
   const playerOptions = (players.data ?? []).map((player) => {
@@ -1078,28 +1064,13 @@ function SeatAtTableDialog({
     };
   });
 
-  const occupiedSeats = new Set(
-    (active.data ?? [])
-      .filter(
-        (session) =>
-          session.table.id === table?.id &&
-          session.seat_number != null,
-      )
-      .map((session) => session.seat_number as number),
-  );
-
   const submit = (event: FormEvent) => {
     event.preventDefault();
 
-    if (!table) return;
+    if (!table || initialSeatNumber == null) return;
 
     if (!playerId) {
       toast.error("Choose a player");
-      return;
-    }
-
-    if (!seatNumber) {
-      toast.error("Choose a seat");
       return;
     }
 
@@ -1116,17 +1087,16 @@ function SeatAtTableDialog({
       {
         player_id: playerId,
         table_id: table.id,
-        seat_number: Number(seatNumber),
+        seat_number: initialSeatNumber,
         seated_at: fromLocalInput(seatedAt),
       },
       {
         onSuccess: () => {
           toast.success(
-            `${playerName ?? "Player"} seated at ${table.name} · Seat #${seatNumber}`,
+            `${playerName ?? "Player"} seated at ${table.name} · Seat #${initialSeatNumber}`,
           );
 
           setPlayerId("");
-          setSeatNumber("");
           setSeatedAt(toLocalInput());
           onClose();
         },
@@ -1140,7 +1110,7 @@ function SeatAtTableDialog({
 
   return (
     <Dialog
-      open={!!table}
+      open={!!table && initialSeatNumber != null}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
@@ -1148,11 +1118,10 @@ function SeatAtTableDialog({
       <DialogContent
         onOpenAutoFocus={() => {
           setPlayerId("");
-          setSeatNumber(initialSeatNumber ? String(initialSeatNumber) : "");
           setSeatedAt(toLocalInput());
         }}
       >
-        {table && (
+        {table && initialSeatNumber != null && (
           <form onSubmit={submit} className="space-y-5">
             <DialogHeader>
               <DialogTitle>
@@ -1160,7 +1129,7 @@ function SeatAtTableDialog({
               </DialogTitle>
 
               <p className="text-sm text-muted-foreground">
-                {table.game_type}
+                {table.game_type} · Seat #{initialSeatNumber}
               </p>
             </DialogHeader>
 
@@ -1177,27 +1146,13 @@ function SeatAtTableDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Seat</Label>
-
-              <Select value={seatNumber} onValueChange={setSeatNumber}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Choose seat…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, index) => index + 1).map(
-                    (number) => (
-                      <SelectItem
-                        key={number}
-                        value={String(number)}
-                        disabled={occupiedSeats.has(number)}
-                      >
-                        Seat #{number}
-                        {occupiedSeats.has(number) ? " · Occupied" : ""}
-                      </SelectItem>
-                    ),
-                  )}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="dashboard_seat_number">Seat</Label>
+              <Input
+                id="dashboard_seat_number"
+                value={`Seat #${initialSeatNumber}`}
+                disabled
+                className="h-12 text-base"
+              />
             </div>
 
             <div className="space-y-2">
