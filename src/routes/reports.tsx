@@ -81,9 +81,6 @@ function excelDuration(ms: number) {
   return ms / MS_PER_DAY;
 }
 
-function excelDuration(ms: number) {
-  return ms / MS_PER_DAY;
-}
 
 function ReportsPage() {
   const sessions = useCompletedSessions();
