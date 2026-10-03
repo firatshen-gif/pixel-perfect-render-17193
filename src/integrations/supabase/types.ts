@@ -22,7 +22,6 @@ export type Database = {
           player_id: string
           seated_at: string
           table_id: string
-          tournament_id: string | null
         }
         Insert: {
           created_at?: string
@@ -31,7 +30,6 @@ export type Database = {
           player_id: string
           seated_at: string
           table_id: string
-          tournament_id?: string | null
         }
         Update: {
           created_at?: string
@@ -40,7 +38,6 @@ export type Database = {
           player_id?: string
           seated_at?: string
           table_id?: string
-          tournament_id?: string | null
         }
         Relationships: [
           {
@@ -57,13 +54,6 @@ export type Database = {
             referencedRelation: "poker_tables"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "play_sessions_tournament_id_fkey"
-            columns: ["tournament_id"]
-            isOneToOne: false
-            referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          },
         ]
       }
       players: {
@@ -71,29 +61,18 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
-          tournament_id: string | null
         }
         Insert: {
           created_at?: string
           full_name: string
           id?: string
-          tournament_id?: string | null
         }
         Update: {
           created_at?: string
           full_name?: string
           id?: string
-          tournament_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "players_tournament_id_fkey"
-            columns: ["tournament_id"]
-            isOneToOne: false
-            referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       poker_tables: {
         Row: {
@@ -101,53 +80,18 @@ export type Database = {
           game_type: string
           id: string
           name: string
-          tournament_id: string | null
         }
         Insert: {
           created_at?: string
           game_type: string
           id?: string
           name: string
-          tournament_id?: string | null
         }
         Update: {
           created_at?: string
           game_type?: string
           id?: string
           name?: string
-          tournament_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "poker_tables_tournament_id_fkey"
-            columns: ["tournament_id"]
-            isOneToOne: false
-            referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tournaments: {
-        Row: {
-          created_at: string
-          id: string
-          location: string
-          name: string
-          timezone: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          location: string
-          name: string
-          timezone: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          location?: string
-          name?: string
-          timezone?: string
         }
         Relationships: []
       }
