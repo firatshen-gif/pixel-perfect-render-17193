@@ -360,17 +360,27 @@ export function useMovePlayer() {
       const openSitout = check(
         await supabase
           .from("session_sitouts")
-          .select("id")
+          .select("id, sat_out_at")
           .eq("play_session_id", s.id)
           .is("sat_in_at", null)
           .maybeSingle(),
-      );
+      ) as { id: string; sat_out_at: string } | null;
 
-      if (openSitout) {
-        throw new Error("Sit the player back in before moving them to another table.");
+      if (openSitout && new Date(s.moved_at) < new Date(openSitout.sat_out_at)) {
+        throw new Error("Move time can't be earlier than the current sit-out time.");
       }
 
-      // 1. Close the player's current session.
+      // If the player is sitting out, close that interval at the move time.
+      if (openSitout) {
+        check(
+          await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: s.moved_at })
+            .eq("id", openSitout.id),
+        );
+      }
+
+      // Close the player's current session at the move time.
       const closeResult = await supabase
         .from("play_sessions")
         .update({ left_at: s.moved_at })
@@ -378,34 +388,95 @@ export function useMovePlayer() {
         .is("left_at", null);
 
       if (closeResult.error) {
+        if (openSitout) {
+          await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: null })
+            .eq("id", openSitout.id);
+        }
+
         throw new Error(closeResult.error.message);
       }
 
-      // 2. Start a new session at the destination table
-      // using exactly the same timestamp.
+      // Start the destination session at exactly the same timestamp.
       const insertResult = await supabase
         .from("play_sessions")
         .insert({
           player_id: s.player_id,
           table_id: s.new_table_id,
           seated_at: s.moved_at,
-        });
+        })
+        .select("id")
+        .single();
 
-      // If creating the new session fails, restore the old
-      // session so the player doesn't accidentally become unseated.
-      if (insertResult.error) {
-        const rollbackResult = await supabase
+      if (insertResult.error || !insertResult.data) {
+        const restoreSession = await supabase
           .from("play_sessions")
           .update({ left_at: null })
           .eq("id", s.id);
 
-        if (rollbackResult.error) {
+        let restoreSitoutError: string | null = null;
+
+        if (openSitout) {
+          const restoreSitout = await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: null })
+            .eq("id", openSitout.id);
+
+          restoreSitoutError = restoreSitout.error?.message ?? null;
+        }
+
+        if (restoreSession.error || restoreSitoutError) {
           throw new Error(
-            `Move failed and the original session could not be restored: ${insertResult.error.message}`,
+            `Move failed and the original state could not be fully restored: ${
+              insertResult.error?.message ?? "Could not create destination session"
+            }`,
           );
         }
 
-        throw new Error(insertResult.error.message);
+        throw new Error(
+          insertResult.error?.message ?? "Could not create destination session.",
+        );
+      }
+
+      // Preserve the sit-out state across the table move.
+      if (openSitout) {
+        const newSitoutResult = await supabase
+          .from("session_sitouts")
+          .insert({
+            play_session_id: insertResult.data.id,
+            sat_out_at: s.moved_at,
+          });
+
+        if (newSitoutResult.error) {
+          // Roll back the destination session and restore the original state.
+          const deleteNewSession = await supabase
+            .from("play_sessions")
+            .delete()
+            .eq("id", insertResult.data.id);
+
+          const restoreSession = await supabase
+            .from("play_sessions")
+            .update({ left_at: null })
+            .eq("id", s.id);
+
+          const restoreSitout = await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: null })
+            .eq("id", openSitout.id);
+
+          if (
+            deleteNewSession.error ||
+            restoreSession.error ||
+            restoreSitout.error
+          ) {
+            throw new Error(
+              `Move failed and the original sit-out state could not be fully restored: ${newSitoutResult.error.message}`,
+            );
+          }
+
+          throw new Error(newSitoutResult.error.message);
+        }
       }
     },
 
