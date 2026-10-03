@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutDashboard, Grid3x3, Users, Armchair, BarChart3, Spade } from "lucide-react";
+import { LayoutDashboard, Grid3x3, Users, Armchair, BarChart3, Spade, Tags } from "lucide-react";
 
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/sessions", label: "Seating", icon: Armchair },
   { to: "/tables", label: "Tables", icon: Grid3x3 },
+  { to: "/game-types", label: "Game Types", icon: Tags },
   { to: "/players", label: "Players", icon: Users },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ] as const;
