@@ -1,13 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useActiveSessions, useDeleteTable, useSaveTable, useTables, type PokerTable } from "@/lib/api";
+import {
+  useActiveSessions,
+  useDeleteTable,
+  useGameTypes,
+  useSaveTable,
+  useTables,
+  type PokerTable,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Empty, Loading, PageHeader } from "@/components/ui-bits";
 
@@ -15,9 +35,9 @@ export const Route = createFileRoute("/tables")({
   head: () => ({
     meta: [
       { title: "Tables — Tournament Floor" },
-      { name: "description", content: "Manage poker tables and game types." },
+      { name: "description", content: "Manage poker tables and their game types." },
       { property: "og:title", content: "Tables — Tournament Floor" },
-      { property: "og:description", content: "Manage poker tables and game types." },
+      { property: "og:description", content: "Manage poker tables and their game types." },
     ],
   }),
   component: TablesPage,
@@ -25,7 +45,7 @@ export const Route = createFileRoute("/tables")({
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
-  game_type: z.string().trim().min(1, "Game type is required").max(100),
+  game_type_id: z.string().uuid("Game type is required"),
 });
 
 function TablesPage() {
@@ -34,7 +54,8 @@ function TablesPage() {
   const del = useDeleteTable();
   const [editing, setEditing] = useState<Partial<PokerTable> | null>(null);
 
-  const seatedCount = (id: string) => active.data?.filter((s) => s.table.id === id).length ?? 0;
+  const seatedCount = (id: string) =>
+    active.data?.filter((s) => s.table.id === id).length ?? 0;
 
   return (
     <>
@@ -47,6 +68,7 @@ function TablesPage() {
           </Button>
         }
       />
+
       {tables.isLoading ? (
         <Loading />
       ) : !tables.data?.length ? (
@@ -55,13 +77,18 @@ function TablesPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tables.data.map((t) => {
             const n = seatedCount(t.id);
+
             return (
-              <div key={t.id} className="flex flex-col rounded-xl border bg-card p-5 shadow-sm">
+              <div
+                key={t.id}
+                className="flex flex-col rounded-xl border bg-card p-5 shadow-sm"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="text-xl font-bold">{t.name}</h3>
                     <p className="text-muted-foreground">{t.game_type}</p>
                   </div>
+
                   <span
                     className={
                       n > 0
@@ -73,10 +100,16 @@ function TablesPage() {
                     {n} seated
                   </span>
                 </div>
+
                 <div className="mt-5 flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => setEditing(t)}>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setEditing(t)}
+                  >
                     <Pencil /> Edit
                   </Button>
+
                   <ConfirmDialog
                     title={`Delete ${t.name}?`}
                     description="This permanently removes the table. Tables with play history can't be deleted."
@@ -87,7 +120,11 @@ function TablesPage() {
                       })
                     }
                     trigger={
-                      <Button variant="outline" size="icon" aria-label="Delete table">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Delete table"
+                      >
                         <Trash2 className="text-destructive" />
                       </Button>
                     }
@@ -98,28 +135,65 @@ function TablesPage() {
           })}
         </div>
       )}
+
       <TableDialog value={editing} onClose={() => setEditing(null)} />
     </>
   );
 }
 
-function TableDialog({ value, onClose }: { value: Partial<PokerTable> | null; onClose: () => void }) {
+function TableDialog({
+  value,
+  onClose,
+}: {
+  value: Partial<PokerTable> | null;
+  onClose: () => void;
+}) {
   const save = useSaveTable();
+  const gameTypes = useGameTypes();
+  const [gameTypeId, setGameTypeId] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!value) return;
+
+    const defaultGameType = gameTypes.data?.find((g) => g.is_default);
+    const fallbackGameType = defaultGameType ?? gameTypes.data?.[0];
+
+    setGameTypeId(
+      value.game_type_id ??
+        fallbackGameType?.id ??
+        "",
+    );
+    setError(null);
+  }, [value, gameTypes.data]);
+
   return (
-    <Dialog open={!!value} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={!!value} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         {value && (
           <form
             key={value.id ?? "new"}
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              const parsed = schema.safeParse({ name: fd.get("name"), game_type: fd.get("game_type") });
-              if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "Invalid");
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              const fd = new FormData(event.currentTarget);
+              const parsed = schema.safeParse({
+                name: fd.get("name"),
+                game_type_id: gameTypeId,
+              });
+
+              if (!parsed.success) {
+                setError(parsed.error.issues[0]?.message ?? "Invalid");
+                return;
+              }
+
               setError(null);
+
               save.mutate(
-                { id: value.id, ...parsed.data },
+                {
+                  id: value.id,
+                  ...parsed.data,
+                },
                 {
                   onSuccess: () => {
                     toast.success(value.id ? "Table updated" : "Table added");
@@ -134,18 +208,60 @@ function TableDialog({ value, onClose }: { value: Partial<PokerTable> | null; on
             <DialogHeader>
               <DialogTitle>{value.id ? "Edit table" : "Add table"}</DialogTitle>
             </DialogHeader>
+
             <div className="space-y-2">
               <Label htmlFor="name">Table name</Label>
-              <Input id="name" name="name" defaultValue={value.name} placeholder="Table 1" className="h-12" autoFocus />
+              <Input
+                id="name"
+                name="name"
+                defaultValue={value.name}
+                placeholder="Table 1"
+                className="h-12"
+                autoFocus
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="game_type">Game type</Label>
-              <Input id="game_type" name="game_type" defaultValue={value.game_type} placeholder="Texas Hold'em" className="h-12" />
+              <Label>Game type</Label>
+
+              {gameTypes.isLoading ? (
+                <div className="text-sm text-muted-foreground">
+                  Loading game types…
+                </div>
+              ) : !gameTypes.data?.length ? (
+                <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                  Add a game type before creating tables.
+                </div>
+              ) : (
+                <Select value={gameTypeId} onValueChange={setGameTypeId}>
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select game type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {gameTypes.data.map((gameType) => (
+                      <SelectItem key={gameType.id} value={gameType.id}>
+                        {gameType.name}
+                        {gameType.is_default ? " · Default" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-            {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+
+            {error && (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            )}
+
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" size="lg" disabled={save.isPending}>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="lg"
+                disabled={save.isPending || !gameTypes.data?.length}
+              >
                 {save.isPending ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>
