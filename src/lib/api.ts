@@ -3,16 +3,23 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type PokerTable = { id: string; name: string; game_type: string; created_at: string };
 export type Player = { id: string; full_name: string; created_at: string };
+export type SessionSitout = {
+  id: string;
+  sat_out_at: string;
+  sat_in_at: string | null;
+};
+
 export type Session = {
   id: string;
   seated_at: string;
   left_at: string | null;
   player: { id: string; full_name: string };
   table: { id: string; name: string; game_type: string };
+  sitouts: SessionSitout[];
 };
 
 const SESSION_SELECT =
-  "id, seated_at, left_at, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type)";
+  "id, seated_at, left_at, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type), sitouts:session_sitouts(id, sat_out_at, sat_in_at)";
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
@@ -160,9 +167,156 @@ export function useLeaveTable() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: async (s: { id: string; seated_at: string; left_at: string }) => {
-      if (new Date(s.left_at) < new Date(s.seated_at))
+      if (new Date(s.left_at) < new Date(s.seated_at)) {
         throw new Error("Left time can't be earlier than seated time.");
-      check(await supabase.from("play_sessions").update({ left_at: s.left_at }).eq("id", s.id));
+      }
+
+      const openSitout = check(
+        await supabase
+          .from("session_sitouts")
+          .select("id, sat_out_at")
+          .eq("play_session_id", s.id)
+          .is("sat_in_at", null)
+          .maybeSingle(),
+      ) as { id: string; sat_out_at: string } | null;
+
+      if (openSitout && new Date(s.left_at) < new Date(openSitout.sat_out_at)) {
+        throw new Error("Unseat time can't be earlier than the current sit-out time.");
+      }
+
+      if (openSitout) {
+        check(
+          await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: s.left_at })
+            .eq("id", openSitout.id),
+        );
+      }
+
+      const closeSession = await supabase
+        .from("play_sessions")
+        .update({ left_at: s.left_at })
+        .eq("id", s.id)
+        .is("left_at", null);
+
+      if (closeSession.error) {
+        if (openSitout) {
+          await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: null })
+            .eq("id", openSitout.id);
+        }
+
+        throw new Error(closeSession.error.message);
+      }
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useSitOut() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (s: {
+      play_session_id: string;
+      seated_at: string;
+      sat_out_at: string;
+    }) => {
+      if (new Date(s.sat_out_at) < new Date(s.seated_at)) {
+        throw new Error("Sit-out time can't be earlier than seated time.");
+      }
+
+      const session = check(
+        await supabase
+          .from("play_sessions")
+          .select("id, left_at")
+          .eq("id", s.play_session_id)
+          .maybeSingle(),
+      ) as { id: string; left_at: string | null } | null;
+
+      if (!session || session.left_at) {
+        throw new Error("This play session is no longer active.");
+      }
+
+      const latest = check(
+        await supabase
+          .from("session_sitouts")
+          .select("id, sat_out_at, sat_in_at")
+          .eq("play_session_id", s.play_session_id)
+          .order("sat_out_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ) as { id: string; sat_out_at: string; sat_in_at: string | null } | null;
+
+      if (latest?.sat_in_at === null) {
+        throw new Error("This player is already sitting out.");
+      }
+
+      if (latest?.sat_in_at && new Date(s.sat_out_at) < new Date(latest.sat_in_at)) {
+        throw new Error("Sit-out time can't overlap a previous sit-out.");
+      }
+
+      const result = await supabase.from("session_sitouts").insert({
+        play_session_id: s.play_session_id,
+        sat_out_at: s.sat_out_at,
+      });
+
+      if (result.error) {
+        if (result.error.code === "23505") {
+          throw new Error("This player is already sitting out.");
+        }
+
+        throw new Error(result.error.message);
+      }
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useSitIn() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (s: {
+      play_session_id: string;
+      sat_in_at: string;
+    }) => {
+      const session = check(
+        await supabase
+          .from("play_sessions")
+          .select("id, left_at")
+          .eq("id", s.play_session_id)
+          .maybeSingle(),
+      ) as { id: string; left_at: string | null } | null;
+
+      if (!session || session.left_at) {
+        throw new Error("This play session is no longer active.");
+      }
+
+      const openSitout = check(
+        await supabase
+          .from("session_sitouts")
+          .select("id, sat_out_at")
+          .eq("play_session_id", s.play_session_id)
+          .is("sat_in_at", null)
+          .maybeSingle(),
+      ) as { id: string; sat_out_at: string } | null;
+
+      if (!openSitout) {
+        throw new Error("This player is not currently sitting out.");
+      }
+
+      if (new Date(s.sat_in_at) < new Date(openSitout.sat_out_at)) {
+        throw new Error("Sit-in time can't be earlier than sit-out time.");
+      }
+
+      check(
+        await supabase
+          .from("session_sitouts")
+          .update({ sat_in_at: s.sat_in_at })
+          .eq("id", openSitout.id),
+      );
     },
     onSuccess: inv,
   });
@@ -201,6 +355,19 @@ export function useMovePlayer() {
 
       if (new Date(s.moved_at) < new Date(s.seated_at)) {
         throw new Error("Move time can't be earlier than seated time.");
+      }
+
+      const openSitout = check(
+        await supabase
+          .from("session_sitouts")
+          .select("id")
+          .eq("play_session_id", s.id)
+          .is("sat_in_at", null)
+          .maybeSingle(),
+      );
+
+      if (openSitout) {
+        throw new Error("Sit the player back in before moving them to another table.");
       }
 
       // 1. Close the player's current session.
