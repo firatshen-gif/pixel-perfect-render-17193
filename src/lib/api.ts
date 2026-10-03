@@ -1,8 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type PokerTable = { id: string; name: string; game_type: string; created_at: string };
+export type GameType = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  created_at: string;
+};
+
+export type PokerTable = {
+  id: string;
+  name: string;
+  game_type_id: string | null;
+  game_type: string;
+  created_at: string;
+};
+
 export type Player = { id: string; full_name: string; created_at: string };
+
 export type SessionSitout = {
   id: string;
   sat_out_at: string;
@@ -18,19 +33,91 @@ export type Session = {
   sitouts: SessionSitout[];
 };
 
+type RawPokerTable = {
+  id: string;
+  name: string;
+  game_type_id: string | null;
+  created_at: string;
+  game_type_ref: { id: string; name: string; is_default?: boolean } | null;
+};
+
+type RawSession = {
+  id: string;
+  seated_at: string;
+  left_at: string | null;
+  player: { id: string; full_name: string };
+  table: {
+    id: string;
+    name: string;
+    game_type_id: string | null;
+    game_type_ref: { id: string; name: string } | null;
+  };
+  sitouts: SessionSitout[];
+};
+
+const TABLE_SELECT =
+  "id, name, created_at, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name, is_default)";
+
 const SESSION_SELECT =
-  "id, seated_at, left_at, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type), sitouts:session_sitouts(id, sat_out_at, sat_in_at)";
+  "id, seated_at, left_at, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name)), sitouts:session_sitouts(id, sat_out_at, sat_in_at)";
+
+function normalizeTable(table: RawPokerTable): PokerTable {
+  return {
+    id: table.id,
+    name: table.name,
+    game_type_id: table.game_type_id,
+    game_type: table.game_type_ref?.name ?? "Unknown game",
+    created_at: table.created_at,
+  };
+}
+
+function normalizeSession(session: RawSession): Session {
+  return {
+    id: session.id,
+    seated_at: session.seated_at,
+    left_at: session.left_at,
+    player: session.player,
+    table: {
+      id: session.table.id,
+      name: session.table.name,
+      game_type: session.table.game_type_ref?.name ?? "Unknown game",
+    },
+    sitouts: session.sitouts ?? [],
+  };
+}
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
   return res.data as T;
 }
 
+export function useGameTypes() {
+  return useQuery({
+    queryKey: ["game-types"],
+    queryFn: async () =>
+      check(
+        await supabase
+          .from("game_types")
+          .select("*")
+          .order("is_default", { ascending: false })
+          .order("name"),
+      ) as GameType[],
+  });
+}
+
 export function useTables() {
   return useQuery({
     queryKey: ["tables"],
-    queryFn: async () =>
-      check(await supabase.from("poker_tables").select("*").order("name")) as PokerTable[],
+    queryFn: async () => {
+      const rows = check(
+        await supabase
+          .from("poker_tables")
+          .select(TABLE_SELECT)
+          .order("name"),
+      ) as unknown as RawPokerTable[];
+
+      return rows.map(normalizeTable);
+    },
   });
 }
 
@@ -46,13 +133,15 @@ export function useActiveSessions() {
   return useQuery({
     queryKey: ["sessions", "active"],
     queryFn: async () =>
-      check(
-        await supabase
-          .from("play_sessions")
-          .select(SESSION_SELECT)
-          .is("left_at", null)
-          .order("seated_at", { ascending: false }),
-      ) as unknown as Session[],
+      (
+        check(
+          await supabase
+            .from("play_sessions")
+            .select(SESSION_SELECT)
+            .is("left_at", null)
+            .order("seated_at", { ascending: false }),
+        ) as unknown as RawSession[]
+      ).map(normalizeSession),
     refetchInterval: 30000,
   });
 }
@@ -61,13 +150,15 @@ export function useCompletedSessions() {
   return useQuery({
     queryKey: ["sessions", "completed"],
     queryFn: async () =>
-      check(
-        await supabase
-          .from("play_sessions")
-          .select(SESSION_SELECT)
-          .not("left_at", "is", null)
-          .order("seated_at", { ascending: false }),
-      ) as unknown as Session[],
+      (
+        check(
+          await supabase
+            .from("play_sessions")
+            .select(SESSION_SELECT)
+            .not("left_at", "is", null)
+            .order("seated_at", { ascending: false }),
+        ) as unknown as RawSession[]
+      ).map(normalizeSession),
   });
 }
 
@@ -76,14 +167,167 @@ function useInvalidate() {
   return () => qc.invalidateQueries();
 }
 
+// ---------- Game types ----------
+async function makeGameTypeDefault(id: string) {
+  const previous = check(
+    await supabase
+      .from("game_types")
+      .select("id")
+      .eq("is_default", true)
+      .maybeSingle(),
+  ) as { id: string } | null;
+
+  if (previous?.id === id) return;
+
+  if (previous) {
+    check(
+      await supabase
+        .from("game_types")
+        .update({ is_default: false })
+        .eq("id", previous.id),
+    );
+  }
+
+  const setDefault = await supabase
+    .from("game_types")
+    .update({ is_default: true })
+    .eq("id", id);
+
+  if (setDefault.error) {
+    if (previous) {
+      await supabase
+        .from("game_types")
+        .update({ is_default: true })
+        .eq("id", previous.id);
+    }
+
+    throw new Error(setDefault.error.message);
+  }
+}
+
+export function useSaveGameType() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (g: {
+      id?: string;
+      name: string;
+      is_default: boolean;
+      was_default?: boolean;
+    }) => {
+      const name = g.name.trim();
+
+      if (!name) throw new Error("Game type name is required.");
+
+      if (g.id) {
+        if (g.was_default && !g.is_default) {
+          throw new Error("Choose another default game type before removing this default.");
+        }
+
+        check(
+          await supabase
+            .from("game_types")
+            .update({ name })
+            .eq("id", g.id),
+        );
+
+        if (g.is_default) {
+          await makeGameTypeDefault(g.id);
+        }
+
+        return;
+      }
+
+      const created = check(
+        await supabase
+          .from("game_types")
+          .insert({ name, is_default: false })
+          .select("id")
+          .single(),
+      ) as { id: string };
+
+      if (g.is_default) {
+        await makeGameTypeDefault(created.id);
+      }
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useSetDefaultGameType() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await makeGameTypeDefault(id);
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useDeleteGameType() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (g: GameType) => {
+      if (g.is_default) {
+        throw new Error("Set another game type as default before deleting this one.");
+      }
+
+      const { count, error } = await supabase
+        .from("poker_tables")
+        .select("id", { count: "exact", head: true })
+        .eq("game_type_id", g.id);
+
+      if (error) throw new Error(error.message);
+
+      if (count && count > 0) {
+        throw new Error(
+          `This game type is used by ${count} table${count === 1 ? "" : "s"} and can't be deleted.`,
+        );
+      }
+
+      check(await supabase.from("game_types").delete().eq("id", g.id));
+    },
+    onSuccess: inv,
+  });
+}
+
 // ---------- Tables ----------
 export function useSaveTable() {
   const inv = useInvalidate();
+
   return useMutation({
-    mutationFn: async (t: { id?: string | undefined; name: string; game_type: string }) => {
-      const payload = { name: t.name.trim(), game_type: t.game_type.trim() };
-      if (t.id) check(await supabase.from("poker_tables").update(payload).eq("id", t.id));
-      else check(await supabase.from("poker_tables").insert(payload));
+    mutationFn: async (t: {
+      id?: string;
+      name: string;
+      game_type_id: string;
+    }) => {
+      const gameType = check(
+        await supabase
+          .from("game_types")
+          .select("id, name")
+          .eq("id", t.game_type_id)
+          .single(),
+      ) as { id: string; name: string };
+
+      // Keep the legacy text column in sync until the final cleanup migration.
+      const payload = {
+        name: t.name.trim(),
+        game_type_id: gameType.id,
+        game_type: gameType.name,
+      };
+
+      if (t.id) {
+        check(
+          await supabase
+            .from("poker_tables")
+            .update(payload)
+            .eq("id", t.id),
+        );
+      } else {
+        check(await supabase.from("poker_tables").insert(payload));
+      }
     },
     onSuccess: inv,
   });
