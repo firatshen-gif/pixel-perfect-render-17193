@@ -3,6 +3,8 @@ import { useState, type FormEvent } from "react";
 import {
   ArrowRightLeft,
   LogOut,
+  Pause,
+  Play,
   Plus,
   Trash2,
   UserRound,
@@ -26,6 +28,8 @@ import {
   useMovePlayer,
   usePlayers,
   useSeatPlayer,
+  useSitIn,
+  useSitOut,
   useTables,
   type PokerTable,
   type Session,
@@ -84,6 +88,8 @@ function Dashboard() {
   const [leavingSession, setLeavingSession] = useState<Session | null>(null);
   const [deletingSession, setDeletingSession] = useState<Session | null>(null);
   const [movingSession, setMovingSession] = useState<Session | null>(null);
+  const [sittingOutSession, setSittingOutSession] = useState<Session | null>(null);
+  const [sittingInSession, setSittingInSession] = useState<Session | null>(null);
 
   if (tables.isLoading || active.isLoading) {
     return (
@@ -156,65 +162,104 @@ function Dashboard() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-{seatedPlayers.map((session) => (
-  <div
-    key={session.id}
-    className="rounded-lg bg-muted/50 px-3 py-3"
-  >
-    <div className="flex items-center justify-between gap-4">
-<div className="min-w-0 flex items-center gap-2">
-  <span className="live-dot shrink-0" />
+{seatedPlayers.map((session) => {
+  const openSitout = session.sitouts.find(
+    (sitout) => !sitout.sat_in_at,
+  );
 
-  <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+  return (
+    <div
+      key={session.id}
+      className="rounded-lg bg-muted/50 px-3 py-3"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 flex items-center gap-2">
+          <span className={openSitout ? "h-2 w-2 shrink-0 rounded-full bg-muted-foreground" : "live-dot shrink-0"} />
 
-  <span className="truncate font-semibold">
-    {session.player.full_name}
-  </span>
-</div>
+          <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
 
-      <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-success">
-        {formatLiveDuration(
-          sessionMs(
-            session.seated_at,
-            null,
-            now,
-          ),
+          <span className="truncate font-semibold">
+            {session.player.full_name}
+          </span>
+        </div>
+
+        <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-success">
+          {formatLiveDuration(
+            sessionMs(
+              session.seated_at,
+              null,
+              now,
+            ),
+          )}
+        </span>
+      </div>
+
+      {openSitout && (
+        <div className="mt-2 flex items-center justify-between rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground">
+          <span className="font-medium">Sitting out</span>
+          <span className="font-mono font-semibold tabular-nums">
+            {formatLiveDuration(
+              now - new Date(openSitout.sat_out_at).getTime(),
+            )}
+          </span>
+        </div>
+      )}
+
+      <div className="mt-2 flex flex-wrap justify-end gap-2">
+        {openSitout ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSittingInSession(session)}
+          >
+            <Play className="h-4 w-4" />
+            Sit In
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSittingOutSession(session)}
+          >
+            <Pause className="h-4 w-4" />
+            Sit Out
+          </Button>
         )}
-      </span>
+
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!!openSitout}
+          title={openSitout ? "Sit the player back in before moving tables" : undefined}
+          onClick={() => setMovingSession(session)}
+        >
+          <ArrowRightLeft className="h-4 w-4" />
+          Move
+        </Button>
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setLeavingSession(session)}
+        >
+          <LogOut className="h-4 w-4" />
+          Unseat
+        </Button>
+
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 text-destructive hover:text-destructive"
+          title="Delete session"
+          aria-label={`Delete ${session.player.full_name}'s session`}
+          onClick={() => setDeletingSession(session)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
-
-<div className="mt-2 flex justify-end gap-2">
-  <Button
-    size="sm"
-    variant="outline"
-    onClick={() => setMovingSession(session)}
-  >
-    <ArrowRightLeft className="h-4 w-4" />
-    Move
-  </Button>
-
-  <Button
-    size="sm"
-    variant="outline"
-    onClick={() => setLeavingSession(session)}
-  >
-    <LogOut className="h-4 w-4" />
-    Unseat
-  </Button>
-
-  <Button
-    size="icon"
-    variant="ghost"
-    className="h-9 w-9 text-destructive hover:text-destructive"
-    title="Delete session"
-    aria-label={`Delete ${session.player.full_name}'s session`}
-    onClick={() => setDeletingSession(session)}
-  >
-    <Trash2 className="h-4 w-4" />
-  </Button>
-</div>
-  </div>
-))}
+  );
+})}
                     </div>
                   )}
                 </div>
@@ -247,6 +292,14 @@ function Dashboard() {
       <UnseatDialog
         session={leavingSession}
         onClose={() => setLeavingSession(null)}
+      />
+      <SitOutDialog
+        session={sittingOutSession}
+        onClose={() => setSittingOutSession(null)}
+      />
+      <SitInDialog
+        session={sittingInSession}
+        onClose={() => setSittingInSession(null)}
       />
 
       <DeleteSessionDialog
@@ -406,6 +459,181 @@ function MovePlayerDialog({
     </Dialog>
   );
 }
+function SitOutDialog({
+  session,
+  onClose,
+}: {
+  session: Session | null;
+  onClose: () => void;
+}) {
+  const sitOut = useSitOut();
+  const [satOutAt, setSatOutAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <Dialog
+      open={!!session}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        onOpenAutoFocus={() => {
+          setSatOutAt(toLocalInput());
+          setError(null);
+        }}
+      >
+        {session && (
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (!satOutAt) {
+                setError("Choose a sit-out time");
+                return;
+              }
+
+              sitOut.mutate(
+                {
+                  play_session_id: session.id,
+                  seated_at: session.seated_at,
+                  sat_out_at: fromLocalInput(satOutAt),
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(`${session.player.full_name} is sitting out`);
+                    onClose();
+                  },
+                  onError: (err) => setError(err.message),
+                },
+              );
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Sit player out</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {session.player.full_name} · {session.table.name}
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <Label htmlFor="dashboard_sat_out_at">Sit-out time</Label>
+              <Input
+                id="dashboard_sat_out_at"
+                type="datetime-local"
+                value={satOutAt}
+                onChange={(event) => setSatOutAt(event.target.value)}
+                className="h-12 text-base"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={sitOut.isPending}>
+                {sitOut.isPending ? "Saving…" : "Confirm Sit Out"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SitInDialog({
+  session,
+  onClose,
+}: {
+  session: Session | null;
+  onClose: () => void;
+}) {
+  const sitIn = useSitIn();
+  const [satInAt, setSatInAt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <Dialog
+      open={!!session}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        onOpenAutoFocus={() => {
+          setSatInAt(toLocalInput());
+          setError(null);
+        }}
+      >
+        {session && (
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (!satInAt) {
+                setError("Choose a sit-in time");
+                return;
+              }
+
+              sitIn.mutate(
+                {
+                  play_session_id: session.id,
+                  sat_in_at: fromLocalInput(satInAt),
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(`${session.player.full_name} is back in`);
+                    onClose();
+                  },
+                  onError: (err) => setError(err.message),
+                },
+              );
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Sit player in</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {session.player.full_name} · {session.table.name}
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <Label htmlFor="dashboard_sat_in_at">Sit-in time</Label>
+              <Input
+                id="dashboard_sat_in_at"
+                type="datetime-local"
+                value={satInAt}
+                onChange={(event) => setSatInAt(event.target.value)}
+                className="h-12 text-base"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={sitIn.isPending}>
+                {sitIn.isPending ? "Saving…" : "Confirm Sit In"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function UnseatDialog({
   session,
   onClose,
