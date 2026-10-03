@@ -42,6 +42,7 @@ export type Database = {
           left_at: string | null
           player_id: string
           seated_at: string
+          seat_number: number | null
           table_id: string
         }
         Insert: {
@@ -50,6 +51,7 @@ export type Database = {
           left_at?: string | null
           player_id: string
           seated_at: string
+          seat_number?: number | null
           table_id: string
         }
         Update: {
@@ -58,6 +60,7 @@ export type Database = {
           left_at?: string | null
           player_id?: string
           seated_at?: string
+          seat_number?: number | null
           table_id?: string
         }
         Relationships: [
