@@ -1,147 +1,179 @@
 import { useEffect, useState } from "react";
 
-/**
- * All timezone handling is per-tournament: every function takes an IANA
- * timezone identifier (e.g. "Asia/Nicosia"). DST is handled by Intl.
- */
+export const TZ = "Asia/Nicosia";
 
-const cache = new Map<string, Intl.DateTimeFormat>();
-function fmt(kind: "display" | "parts" | "date", tz: string) {
-  const key = `${kind}|${tz}`;
-  let f = cache.get(key);
-  if (!f) {
-    f =
-      kind === "display"
-        ? new Intl.DateTimeFormat("en-GB", {
-            timeZone: tz,
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hourCycle: "h23",
-          })
-        : kind === "parts"
-          ? new Intl.DateTimeFormat("en-CA", {
-              timeZone: tz,
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hourCycle: "h23",
-            })
-          : new Intl.DateTimeFormat("en-CA", {
-              timeZone: tz,
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-            });
-    cache.set(key, f);
-  }
-  return f;
-}
+const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TZ,
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
-function getParts(formatter: Intl.DateTimeFormat, date: Date) {
+const localInputFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+const localDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function getParts(
+  formatter: Intl.DateTimeFormat,
+  date: Date,
+) {
   const result: Record<string, string> = {};
+
   for (const part of formatter.formatToParts(date)) {
-    if (part.type !== "literal") result[part.type] = part.value;
+    if (part.type !== "literal") {
+      result[part.type] = part.value;
+    }
   }
+
   return result;
 }
 
-/** All IANA timezones supported by the browser. */
-export function listTimezones(): string[] {
-  const intl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
-  const list = intl.supportedValuesOf?.("timeZone");
-  if (list?.length) return list;
-  return ["Asia/Nicosia", "Europe/Istanbul", "Europe/London", "America/New_York", "Asia/Dubai", "UTC"];
-}
-
-export function isValidTimezone(tz: string) {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: tz });
-    return /\//.test(tz) || tz === "UTC";
-  } catch {
-    return false;
-  }
-}
-
-/** "05 Oct 2026, 18:30" in the given timezone */
-export function formatDateTime(iso: string | Date | null | undefined, tz: string) {
+/** "05 Oct 2026, 18:30" in Cyprus local time */
+export function formatDateTime(
+  iso: string | Date | null | undefined,
+) {
   if (!iso) return "—";
-  return fmt("display", tz).format(new Date(iso));
+
+  return dateTimeFormatter.format(new Date(iso));
 }
 
 /** Duration in ms -> "3h 45m" */
 export function formatDuration(ms: number) {
   if (!isFinite(ms) || ms < 0) ms = 0;
+
   const totalMin = Math.floor(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
+
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 /** Duration in ms -> "01:42:17" */
 export function formatLiveDuration(ms: number) {
   if (!isFinite(ms) || ms < 0) ms = 0;
+
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds].map((v) => String(v).padStart(2, "0")).join(":");
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
 }
 
-export function sessionMs(seated: string, left: string | null, now = Date.now()) {
-  return (left ? new Date(left).getTime() : now) - new Date(seated).getTime();
-}
-
-/** Wall-clock components of an instant in tz, expressed as a UTC ms value. */
-export function wallClockAsUtcMs(date: Date, tz: string) {
-  const p = getParts(fmt("parts", tz), date);
-  return Date.UTC(
-    Number(p.year),
-    Number(p.month) - 1,
-    Number(p.day),
-    Number(p.hour) % 24,
-    Number(p.minute),
-    Number(p.second),
+export function sessionMs(
+  seated: string,
+  left: string | null,
+  now = Date.now(),
+) {
+  return (
+    (left ? new Date(left).getTime() : now) -
+    new Date(seated).getTime()
   );
 }
 
-function offsetMs(date: Date, tz: string) {
-  return wallClockAsUtcMs(date, tz) - Math.floor(date.getTime() / 1000) * 1000;
+/**
+ * UTC offset used by Cyprus at a specific instant.
+ * Automatically handles UTC+3 / UTC+2 DST changes.
+ */
+function getCyprusOffsetMs(date: Date) {
+  const parts = getParts(localInputFormatter, date);
+
+  const localAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+
+  const instantWithoutMs =
+    Math.floor(date.getTime() / 1000) * 1000;
+
+  return localAsUtc - instantWithoutMs;
 }
 
-/** Value for <input type="datetime-local"> in the given timezone. */
-export function toLocalInput(d: Date, tz: string) {
-  const p = getParts(fmt("parts", tz), d);
-  return `${p.year}-${p.month}-${p.day}T${String(Number(p.hour) % 24).padStart(2, "0")}:${p.minute}`;
+/** Value for <input type="datetime-local"> in Cyprus local time. */
+export function toLocalInput(d: Date = new Date()) {
+  const parts = getParts(localInputFormatter, d);
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-/** Parse datetime-local as wall-clock time in tz -> UTC ISO string. */
-export function fromLocalInput(v: string, tz: string) {
-  const [datePart = "", timePart = "00:00"] = v.split("T");
+/** Parse datetime-local as Cyprus local time -> UTC ISO string. */
+export function fromLocalInput(v: string) {
+  const [datePart, timePart] = v.split("T");
+
   const [year, month, day] = datePart.split("-").map(Number);
   const [hour, minute] = timePart.split(":").map(Number);
-  const localAsUtc = Date.UTC(year!, month! - 1, day!, hour!, minute!, 0);
+
+  const localAsUtc = Date.UTC(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+    0,
+  );
+
+  // Initial approximation.
   let result = new Date(localAsUtc);
-  for (let i = 0; i < 2; i++) result = new Date(localAsUtc - offsetMs(result, tz));
+
+  // Recalculate using the actual Cyprus offset for that date.
+  for (let i = 0; i < 2; i++) {
+    const offset = getCyprusOffsetMs(result);
+    result = new Date(localAsUtc - offset);
+  }
+
   return result.toISOString();
 }
 
-/** Calendar date "YYYY-MM-DD" for a timestamp in tz. */
-export function localDate(iso: string, tz: string) {
-  const p = getParts(fmt("date", tz), new Date(iso));
-  return `${p.year}-${p.month}-${p.day}`;
+/** Cyprus calendar date "YYYY-MM-DD" for a timestamp. */
+export function cyprusDate(iso: string) {
+  const parts = getParts(
+    localDateFormatter,
+    new Date(iso),
+  );
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
+
+/**
+ * Keep the old function name temporarily so existing code
+ * continues working without changing other files yet.
+ */
+export const istanbulDate = cyprusDate;
 
 export function useNow(intervalMs = 30000) {
   const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    const id = setInterval(
+      () => setNow(Date.now()),
+      intervalMs,
+    );
+
     return () => clearInterval(id);
   }, [intervalMs]);
+
   return now;
 }
