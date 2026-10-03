@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_types: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       play_sessions: {
         Row: {
           created_at: string
@@ -110,22 +131,33 @@ export type Database = {
         Row: {
           created_at: string
           game_type: string
+          game_type_id: string | null
           id: string
           name: string
         }
         Insert: {
           created_at?: string
           game_type: string
+          game_type_id?: string | null
           id?: string
           name: string
         }
         Update: {
           created_at?: string
           game_type?: string
+          game_type_id?: string | null
           id?: string
           name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "poker_tables_game_type_id_fkey"
+            columns: ["game_type_id"]
+            isOneToOne: false
+            referencedRelation: "game_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
