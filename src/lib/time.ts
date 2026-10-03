@@ -90,6 +90,32 @@ export function sessionMs(
   );
 }
 
+export function sitOutMs(
+  sitouts: Array<{ sat_out_at: string; sat_in_at: string | null }> = [],
+  now = Date.now(),
+) {
+  return sitouts.reduce((total, sitout) => {
+    const start = new Date(sitout.sat_out_at).getTime();
+    const end = sitout.sat_in_at
+      ? new Date(sitout.sat_in_at).getTime()
+      : now;
+
+    return total + Math.max(0, end - start);
+  }, 0);
+}
+
+export function playMs(
+  seated: string,
+  left: string | null,
+  sitouts: Array<{ sat_out_at: string; sat_in_at: string | null }> = [],
+  now = Date.now(),
+) {
+  return Math.max(
+    0,
+    sessionMs(seated, left, now) - sitOutMs(sitouts, now),
+  );
+}
+
 /**
  * UTC offset used by Cyprus at a specific instant.
  * Automatically handles UTC+3 / UTC+2 DST changes.
