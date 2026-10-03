@@ -215,7 +215,6 @@ function TableDialog({
                 id="name"
                 name="name"
                 defaultValue={value.name}
-                placeholder="Table 1"
                 className="h-12"
                 autoFocus
               />
