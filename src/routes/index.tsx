@@ -132,30 +132,27 @@ function Dashboard() {
             return (
               <div
                 key={table.id}
-                className="flex min-h-64 flex-col rounded-xl border bg-card shadow-sm"
+                className="flex flex-col rounded-xl border bg-card shadow-sm"
               >
                 {/* Table header */}
-                <div className="border-b px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-  {/* Small poker-table visual */}
-  <div
-    className="flex h-9 w-14 shrink-0 items-center justify-center rounded-[50%] border-2 border-primary/25 bg-primary/10 text-[10px] font-bold tracking-wider text-primary"
-    aria-hidden="true"
-  >
-    ♠ ♥ ♦ ♣
-  </div>
+                <div className="border-b px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <h2 className="truncate text-base font-bold">
+                        {table.name}
+                      </h2>
 
-  <div className="min-w-0">
-    <h2 className="truncate text-xl font-bold">
-      {table.name}
-    </h2>
+                      <span
+                        className="shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        ·
+                      </span>
 
-    <p className="mt-1 truncate text-sm text-muted-foreground">
-      {table.game_type}
-    </p>
-  </div>
-</div>
+                      <span className="truncate text-sm text-muted-foreground">
+                        {table.game_type}
+                      </span>
+                    </div>
 
                     <TooltipProvider delayDuration={250}>
                       <div
