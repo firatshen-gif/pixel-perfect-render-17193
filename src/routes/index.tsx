@@ -61,6 +61,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -91,6 +98,7 @@ function Dashboard() {
   const now = useNow(1000);
 
   const [seatingTable, setSeatingTable] = useState<PokerTable | null>(null);
+  const [seatingSeatNumber, setSeatingSeatNumber] = useState<number | null>(null);
   const [leavingSession, setLeavingSession] = useState<Session | null>(null);
   const [deletingSession, setDeletingSession] = useState<Session | null>(null);
   const [movingSession, setMovingSession] = useState<Session | null>(null);
@@ -128,6 +136,146 @@ function Dashboard() {
               session.sitouts.some((sitout) => !sitout.sat_in_at),
             ).length;
             const sittingInCount = seatedPlayers.length - sittingOutCount;
+            const unassignedPlayers = seatedPlayers.filter(
+              (session) => session.seat_number == null,
+            );
+
+            const renderPlayerRow = (
+              session: Session,
+              seatNumber: number | null,
+            ) => {
+              const openSitout = session.sitouts.find(
+                (sitout) => !sitout.sat_in_at,
+              );
+
+              return (
+                <div
+                  key={session.id}
+                  className="flex min-h-9 items-center gap-2 px-2 py-1.5"
+                >
+                  <span className="w-8 shrink-0 text-xs font-bold tabular-nums text-muted-foreground">
+                    {seatNumber ? `#${seatNumber}` : "—"}
+                  </span>
+
+                  <TooltipProvider delayDuration={200}>
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      {openSitout ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 ring-1 ring-amber-500/40"
+                              tabIndex={0}
+                              aria-label={`Sitting out for ${formatLiveDuration(
+                                now - new Date(openSitout.sat_out_at).getTime(),
+                              )}`}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Sitting out for{" "}
+                            {formatLiveDuration(
+                              now - new Date(openSitout.sat_out_at).getTime(),
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="live-dot shrink-0" />
+                      )}
+
+                      <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+
+                      <span className="truncate text-sm font-semibold">
+                        {session.player.full_name}
+                      </span>
+                    </div>
+
+                    <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-success">
+                      {formatLiveDuration(
+                        sessionMs(session.seated_at, null, now),
+                      )}
+                    </span>
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      {openSitout ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              aria-label={`Sit ${session.player.full_name} in`}
+                              onClick={() => setSittingInSession(session)}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">Sit In</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              aria-label={`Sit ${session.player.full_name} out`}
+                              onClick={() => setSittingOutSession(session)}
+                            >
+                              <Pause className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">Sit Out</TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-7 w-7"
+                            aria-label={`Move ${session.player.full_name}`}
+                            onClick={() => setMovingSession(session)}
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Move / Change seat</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-7 w-7"
+                            aria-label={`Unseat ${session.player.full_name}`}
+                            onClick={() => setLeavingSession(session)}
+                          >
+                            <LogOut className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Unseat</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            aria-label={`Delete ${session.player.full_name}'s session`}
+                            onClick={() => setDeletingSession(session)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Delete session</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
+                </div>
+              );
+            };
 
             return (
               <div
@@ -205,149 +353,50 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Seated players */}
-                <div className="flex-1 p-4">
-                  {!seatedPlayers.length ? (
-                    <div className="flex h-full min-h-24 items-center justify-center text-sm text-muted-foreground">
-                      No players seated
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-{seatedPlayers.map((session) => {
-  const openSitout = session.sitouts.find(
-    (sitout) => !sitout.sat_in_at,
-  );
+                {/* Seats 1-12 */}
+                <div className="flex-1 p-2">
+                  <div className="divide-y overflow-hidden rounded-lg border">
+                    {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                      (seatNumber) => {
+                        const session = seatedPlayers.find(
+                          (item) => item.seat_number === seatNumber,
+                        );
 
-  return (
-    <div
-      key={session.id}
-      className="rounded-lg bg-muted/50 px-2.5 py-2"
-    >
-      <TooltipProvider delayDuration={200}>
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            {openSitout ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 ring-1 ring-amber-500/40"
-                    tabIndex={0}
-                    aria-label={`Sitting out for ${formatLiveDuration(
-                      now - new Date(openSitout.sat_out_at).getTime(),
-                    )}`}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Sitting out for{" "}
-                  {formatLiveDuration(
-                    now - new Date(openSitout.sat_out_at).getTime(),
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <span className="live-dot shrink-0" />
-            )}
+                        if (session) {
+                          return renderPlayerRow(session, seatNumber);
+                        }
 
-            <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        return (
+                          <button
+                            key={seatNumber}
+                            type="button"
+                            className="flex min-h-9 w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
+                            onClick={() => {
+                              setSeatingTable(table);
+                              setSeatingSeatNumber(seatNumber);
+                            }}
+                          >
+                            <span className="w-8 shrink-0 text-xs font-bold tabular-nums">
+                              #{seatNumber}
+                            </span>
+                            <span className="flex-1">Empty</span>
+                            <Plus className="h-3.5 w-3.5 opacity-50" />
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
 
-            <span className="truncate text-sm font-semibold">
-              {session.player.full_name}
-            </span>
-          </div>
-
-          <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-success">
-            {formatLiveDuration(
-              sessionMs(
-                session.seated_at,
-                null,
-                now,
-              ),
-            )}
-          </span>
-
-          <div className="flex shrink-0 items-center gap-1">
-            {openSitout ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    aria-label={`Sit ${session.player.full_name} in`}
-                    onClick={() => setSittingInSession(session)}
-                  >
-                    <Play className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Sit In</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    aria-label={`Sit ${session.player.full_name} out`}
-                    onClick={() => setSittingOutSession(session)}
-                  >
-                    <Pause className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Sit Out</TooltipContent>
-              </Tooltip>
-            )}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  aria-label={`Move ${session.player.full_name}`}
-                  onClick={() => setMovingSession(session)}
-                >
-                  <ArrowRightLeft className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Move</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  aria-label={`Unseat ${session.player.full_name}`}
-                  onClick={() => setLeavingSession(session)}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Unseat</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  aria-label={`Delete ${session.player.full_name}'s session`}
-                  onClick={() => setDeletingSession(session)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Delete session</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-      </TooltipProvider>
-    </div>
-  );
-})}
+                  {unassignedPlayers.length > 0 && (
+                    <div className="mt-2 overflow-hidden rounded-lg border border-dashed">
+                      <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Unassigned seat
+                      </div>
+                      <div className="divide-y">
+                        {unassignedPlayers.map((session) =>
+                          renderPlayerRow(session, null),
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -357,7 +406,10 @@ function Dashboard() {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => setSeatingTable(table)}
+                    onClick={() => {
+                      setSeatingTable(table);
+                      setSeatingSeatNumber(null);
+                    }}
                   >
                     <Plus className="h-4 w-4" />
                     Seat Player
@@ -371,7 +423,11 @@ function Dashboard() {
 
       <SeatAtTableDialog
         table={seatingTable}
-        onClose={() => setSeatingTable(null)}
+        initialSeatNumber={seatingSeatNumber}
+        onClose={() => {
+          setSeatingTable(null);
+          setSeatingSeatNumber(null);
+        }}
       />
       <MovePlayerDialog
         session={movingSession}
@@ -405,19 +461,35 @@ function MovePlayerDialog({
   onClose: () => void;
 }) {
   const tables = useTables();
+  const active = useActiveSessions();
   const movePlayer = useMovePlayer();
 
   const [newTableId, setNewTableId] = useState("");
+  const [newSeatNumber, setNewSeatNumber] = useState("");
   const [movedAt, setMovedAt] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const tableOptions = (tables.data ?? [])
-    .filter((table) => table.id !== session?.table.id)
-    .map((table) => ({
-      value: table.id,
-      label: table.name,
-      hint: table.game_type,
-    }));
+  const tableOptions = (tables.data ?? []).map((table) => ({
+    value: table.id,
+    label: table.name,
+    hint:
+      table.id === session?.table.id
+        ? `${table.game_type} · Current table`
+        : table.game_type,
+  }));
+
+  const occupiedSeats = new Set(
+    (active.data ?? [])
+      .filter(
+        (item) =>
+          item.table.id === newTableId &&
+          item.id !== session?.id &&
+          item.seat_number != null,
+      )
+      .map((item) => item.seat_number as number),
+  );
+
+  const isSameTable = !!session && newTableId === session.table.id;
 
   return (
     <Dialog
@@ -428,7 +500,8 @@ function MovePlayerDialog({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setNewTableId("");
+          setNewTableId(session?.table.id ?? "");
+          setNewSeatNumber("");
           setMovedAt(toLocalInput());
           setError(null);
         }}
@@ -444,7 +517,12 @@ function MovePlayerDialog({
                 return;
               }
 
-              if (!movedAt) {
+              if (!newSeatNumber) {
+                setError("Choose a seat");
+                return;
+              }
+
+              if (!isSameTable && !movedAt) {
                 setError("Choose a move time");
                 return;
               }
@@ -458,7 +536,9 @@ function MovePlayerDialog({
                   id: session.id,
                   player_id: session.player.id,
                   current_table_id: session.table.id,
+                  current_seat_number: session.seat_number,
                   new_table_id: newTableId,
+                  new_seat_number: Number(newSeatNumber),
                   seated_at: session.seated_at,
                   moved_at: fromLocalInput(movedAt),
                 },
@@ -468,15 +548,21 @@ function MovePlayerDialog({
                       (sitout) => !sitout.sat_in_at,
                     );
 
-                    toast.success(
-                      isSittingOut
-                        ? `${session.player.full_name} moved to ${
-                            destinationTable?.name ?? "new table"
-                          } and remains sitting out`
-                        : `${session.player.full_name} moved to ${
-                            destinationTable?.name ?? "new table"
-                          }`,
-                    );
+                    if (isSameTable) {
+                      toast.success(
+                        `${session.player.full_name} moved to seat #${newSeatNumber}`,
+                      );
+                    } else {
+                      toast.success(
+                        isSittingOut
+                          ? `${session.player.full_name} moved to ${
+                              destinationTable?.name ?? "new table"
+                            } · Seat #${newSeatNumber} and remains sitting out`
+                          : `${session.player.full_name} moved to ${
+                              destinationTable?.name ?? "new table"
+                            } · Seat #${newSeatNumber}`,
+                      );
+                    }
 
                     onClose();
                   },
@@ -492,23 +578,27 @@ function MovePlayerDialog({
               <DialogTitle>Move player</DialogTitle>
 
               <p className="text-sm text-muted-foreground">
-                {session.player.full_name} · Currently at{" "}
-                {session.table.name}
+                {session.player.full_name} · {session.table.name}
+                {session.seat_number ? ` · Seat #${session.seat_number}` : ""}
               </p>
 
               {session.sitouts.some((sitout) => !sitout.sat_in_at) && (
                 <p className="text-sm font-medium text-muted-foreground">
-                  This player is sitting out and will remain sitting out after the move.
+                  If moved to another table, this player will remain sitting out.
                 </p>
               )}
             </DialogHeader>
 
             <div className="space-y-2">
-              <Label>Move to</Label>
+              <Label>Table</Label>
 
               <Combobox
                 value={newTableId}
-                onChange={setNewTableId}
+                onChange={(value) => {
+                  setNewTableId(value);
+                  setNewSeatNumber("");
+                  setError(null);
+                }}
                 placeholder="Choose table…"
                 searchPlaceholder="Search tables…"
                 options={tableOptions}
@@ -516,20 +606,56 @@ function MovePlayerDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dashboard_moved_at">
-                Move time
-              </Label>
+              <Label>Seat</Label>
 
-              <Input
-                id="dashboard_moved_at"
-                type="datetime-local"
-                value={movedAt}
-                onChange={(event) =>
-                  setMovedAt(event.target.value)
-                }
-                className="h-12 text-base"
-              />
+              <Select
+                value={newSeatNumber}
+                onValueChange={(value) => {
+                  setNewSeatNumber(value);
+                  setError(null);
+                }}
+              >
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Choose seat…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                    (seatNumber) => (
+                      <SelectItem
+                        key={seatNumber}
+                        value={String(seatNumber)}
+                        disabled={occupiedSeats.has(seatNumber)}
+                      >
+                        Seat #{seatNumber}
+                        {session.seat_number === seatNumber && isSameTable
+                          ? " · Current"
+                          : occupiedSeats.has(seatNumber)
+                            ? " · Occupied"
+                            : ""}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
             </div>
+
+            {!isSameTable && (
+              <div className="space-y-2">
+                <Label htmlFor="dashboard_moved_at">
+                  Move time
+                </Label>
+
+                <Input
+                  id="dashboard_moved_at"
+                  type="datetime-local"
+                  value={movedAt}
+                  onChange={(event) =>
+                    setMovedAt(event.target.value)
+                  }
+                  className="h-12 text-base"
+                />
+              </div>
+            )}
 
             {error && (
               <p className="text-sm font-medium text-destructive">
@@ -552,7 +678,9 @@ function MovePlayerDialog({
               >
                 {movePlayer.isPending
                   ? "Moving…"
-                  : "Move Player"}
+                  : isSameTable
+                    ? "Change Seat"
+                    : "Move Player"}
               </Button>
             </DialogFooter>
           </form>
@@ -561,6 +689,7 @@ function MovePlayerDialog({
     </Dialog>
   );
 }
+
 function SitOutDialog({
   session,
   onClose,
@@ -919,9 +1048,11 @@ function DeleteSessionDialog({
 }
 function SeatAtTableDialog({
   table,
+  initialSeatNumber,
   onClose,
 }: {
   table: PokerTable | null;
+  initialSeatNumber: number | null;
   onClose: () => void;
 }) {
   const players = usePlayers();
@@ -929,6 +1060,7 @@ function SeatAtTableDialog({
   const seat = useSeatPlayer();
 
   const [playerId, setPlayerId] = useState("");
+  const [seatNumber, setSeatNumber] = useState("");
   const [seatedAt, setSeatedAt] = useState(() => toLocalInput());
 
   const playerOptions = (players.data ?? []).map((player) => {
@@ -946,6 +1078,16 @@ function SeatAtTableDialog({
     };
   });
 
+  const occupiedSeats = new Set(
+    (active.data ?? [])
+      .filter(
+        (session) =>
+          session.table.id === table?.id &&
+          session.seat_number != null,
+      )
+      .map((session) => session.seat_number as number),
+  );
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
 
@@ -953,6 +1095,11 @@ function SeatAtTableDialog({
 
     if (!playerId) {
       toast.error("Choose a player");
+      return;
+    }
+
+    if (!seatNumber) {
+      toast.error("Choose a seat");
       return;
     }
 
@@ -969,15 +1116,17 @@ function SeatAtTableDialog({
       {
         player_id: playerId,
         table_id: table.id,
+        seat_number: Number(seatNumber),
         seated_at: fromLocalInput(seatedAt),
       },
       {
         onSuccess: () => {
           toast.success(
-            `${playerName ?? "Player"} seated at ${table.name}`,
+            `${playerName ?? "Player"} seated at ${table.name} · Seat #${seatNumber}`,
           );
 
           setPlayerId("");
+          setSeatNumber("");
           setSeatedAt(toLocalInput());
           onClose();
         },
@@ -999,6 +1148,7 @@ function SeatAtTableDialog({
       <DialogContent
         onOpenAutoFocus={() => {
           setPlayerId("");
+          setSeatNumber(initialSeatNumber ? String(initialSeatNumber) : "");
           setSeatedAt(toLocalInput());
         }}
       >
@@ -1024,6 +1174,30 @@ function SeatAtTableDialog({
                 searchPlaceholder="Search player…"
                 options={playerOptions}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Seat</Label>
+
+              <Select value={seatNumber} onValueChange={setSeatNumber}>
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Choose seat…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                    (number) => (
+                      <SelectItem
+                        key={number}
+                        value={String(number)}
+                        disabled={occupiedSeats.has(number)}
+                      >
+                        Seat #{number}
+                        {occupiedSeats.has(number) ? " · Occupied" : ""}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
