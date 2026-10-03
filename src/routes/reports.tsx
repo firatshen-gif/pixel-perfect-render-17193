@@ -13,7 +13,9 @@ import {
   formatDateTime,
   formatDuration,
   istanbulDate,
+  playMs,
   sessionMs,
+  sitOutMs,
   toLocalInput,
 } from "@/lib/time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -113,29 +115,71 @@ function ReportsPage() {
   );
 
   const playerSummary = useMemo(() => {
-    const m = new Map<string, { id: string; name: string; ms: number; n: number }>();
+    const m = new Map<
+      string,
+      { id: string; name: string; totalMs: number; sitoutMs: number; playMs: number; n: number }
+    >();
+
     filtered.forEach((s) => {
-      const r = m.get(s.player.id) ?? { id: s.player.id, name: s.player.full_name, ms: 0, n: 0 };
-      r.ms += sessionMs(s.seated_at, s.left_at);
+      const r = m.get(s.player.id) ?? {
+        id: s.player.id,
+        name: s.player.full_name,
+        totalMs: 0,
+        sitoutMs: 0,
+        playMs: 0,
+        n: 0,
+      };
+
+      r.totalMs += sessionMs(s.seated_at, s.left_at);
+      r.sitoutMs += sitOutMs(s.sitouts);
+      r.playMs += playMs(s.seated_at, s.left_at, s.sitouts);
       r.n += 1;
       m.set(s.player.id, r);
     });
-    return [...m.values()].sort((a, b) => b.ms - a.ms);
+
+    return [...m.values()].sort((a, b) => b.playMs - a.playMs);
   }, [filtered]);
 
   const tableSummary = useMemo(() => {
-    const m = new Map<string, { name: string; game: string; ms: number; n: number; players: Set<string> }>();
+    const m = new Map<
+      string,
+      {
+        name: string;
+        game: string;
+        totalMs: number;
+        sitoutMs: number;
+        playMs: number;
+        n: number;
+        players: Set<string>;
+      }
+    >();
+
     filtered.forEach((s) => {
-      const r = m.get(s.table.id) ?? { name: s.table.name, game: s.table.game_type, ms: 0, n: 0, players: new Set() };
-      r.ms += sessionMs(s.seated_at, s.left_at);
+      const r = m.get(s.table.id) ?? {
+        name: s.table.name,
+        game: s.table.game_type,
+        totalMs: 0,
+        sitoutMs: 0,
+        playMs: 0,
+        n: 0,
+        players: new Set<string>(),
+      };
+
+      r.totalMs += sessionMs(s.seated_at, s.left_at);
+      r.sitoutMs += sitOutMs(s.sitouts);
+      r.playMs += playMs(s.seated_at, s.left_at, s.sitouts);
       r.n += 1;
       r.players.add(s.player.id);
       m.set(s.table.id, r);
     });
+
     return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [filtered]);
 
-  const totalMs = filtered.reduce((a, s) => a + sessionMs(s.seated_at, s.left_at), 0);
+  const totalMs = filtered.reduce(
+    (sum, s) => sum + playMs(s.seated_at, s.left_at, s.sitouts),
+    0,
+  );
   const set = (k: keyof Filters) => (v: string) => setF((p) => ({ ...p, [k]: v }));
   const active = Object.values(f).some(Boolean);
 
@@ -148,7 +192,9 @@ const exportExcel = () => {
 
     rows = playerSummary.map((r) => ({
       Player: r.name,
-      "Total time": excelDuration(r.ms),
+      "Total time": excelDuration(r.totalMs),
+      "Sit-out time": excelDuration(r.sitoutMs),
+      "Play time": excelDuration(r.playMs),
       Sessions: r.n,
     }));
   } else if (tab === "tables") {
@@ -157,7 +203,9 @@ const exportExcel = () => {
     rows = tableSummary.map((r) => ({
       Table: r.name,
       Game: r.game,
-      "Total time": excelDuration(r.ms),
+      "Total time": excelDuration(r.totalMs),
+      "Sit-out time": excelDuration(r.sitoutMs),
+      "Play time": excelDuration(r.playMs),
       Sessions: r.n,
       "Unique players": r.players.size,
     }));
@@ -170,8 +218,12 @@ const exportExcel = () => {
       Game: s.table.game_type,
       Seated: excelCyprusDate(s.seated_at),
       Left: excelCyprusDate(s.left_at),
-      Duration: excelDuration(
+      "Total time": excelDuration(
         sessionMs(s.seated_at, s.left_at),
+      ),
+      "Sit-out time": excelDuration(sitOutMs(s.sitouts)),
+      "Play time": excelDuration(
+        playMs(s.seated_at, s.left_at, s.sitouts),
       ),
     }));
   }
@@ -182,32 +234,25 @@ const exportExcel = () => {
   // Apply real Excel number/date formats.
   for (let row = 2; row <= rows.length + 1; row++) {
     if (tab === "players") {
-      const totalTimeCell = ws[`B${row}`];
-
-      if (totalTimeCell) {
-        totalTimeCell.z = "[h]:mm";
+      for (const column of ["B", "C", "D"]) {
+        const cell = ws[`${column}${row}`];
+        if (cell) cell.z = "[h]:mm";
       }
     } else if (tab === "tables") {
-      const totalTimeCell = ws[`C${row}`];
-
-      if (totalTimeCell) {
-        totalTimeCell.z = "[h]:mm";
+      for (const column of ["C", "D", "E"]) {
+        const cell = ws[`${column}${row}`];
+        if (cell) cell.z = "[h]:mm";
       }
     } else {
       const seatedCell = ws[`D${row}`];
       const leftCell = ws[`E${row}`];
-      const durationCell = ws[`F${row}`];
 
-      if (seatedCell) {
-        seatedCell.z = "dd.mm.yyyy hh:mm";
-      }
+      if (seatedCell) seatedCell.z = "dd.mm.yyyy hh:mm";
+      if (leftCell) leftCell.z = "dd.mm.yyyy hh:mm";
 
-      if (leftCell) {
-        leftCell.z = "dd.mm.yyyy hh:mm";
-      }
-
-      if (durationCell) {
-        durationCell.z = "[h]:mm";
+      for (const column of ["F", "G", "H"]) {
+        const cell = ws[`${column}${row}`];
+        if (cell) cell.z = "[h]:mm";
       }
     }
   }
@@ -310,6 +355,8 @@ const exportExcel = () => {
                     <tr>
                       <th className="px-4 py-3">Player</th>
                       <th className="px-4 py-3 text-right">Total time</th>
+                      <th className="px-4 py-3 text-right">Sit-out</th>
+                      <th className="px-4 py-3 text-right">Play time</th>
                       <th className="px-4 py-3 text-right">Sessions</th>
                       <th className="w-8" />
                     </tr>
@@ -318,7 +365,9 @@ const exportExcel = () => {
                     {playerSummary.map((r) => (
                       <tr key={r.id} className="cursor-pointer border-t hover:bg-muted/60" onClick={() => setDetail(r.id)}>
                         <td className="px-4 py-3 font-semibold">{r.name}</td>
-                        <td className="px-4 py-3 text-right tabular">{formatDuration(r.ms)}</td>
+                        <td className="px-4 py-3 text-right tabular">{formatDuration(r.totalMs)}</td>
+                        <td className="px-4 py-3 text-right tabular">{formatDuration(r.sitoutMs)}</td>
+                        <td className="px-4 py-3 text-right font-semibold tabular">{formatDuration(r.playMs)}</td>
                         <td className="px-4 py-3 text-right tabular">{r.n}</td>
                         <td className="pr-3"><ChevronRight className="h-4 w-4 text-muted-foreground" /></td>
                       </tr>
@@ -338,6 +387,8 @@ const exportExcel = () => {
                       <th className="px-4 py-3">Table</th>
                       <th className="px-4 py-3">Game</th>
                       <th className="px-4 py-3 text-right">Total time</th>
+                      <th className="px-4 py-3 text-right">Sit-out</th>
+                      <th className="px-4 py-3 text-right">Play time</th>
                       <th className="px-4 py-3 text-right">Sessions</th>
                       <th className="px-4 py-3 text-right">Unique players</th>
                     </tr>
@@ -347,7 +398,9 @@ const exportExcel = () => {
                       <tr key={r.name} className="border-t">
                         <td className="px-4 py-3 font-semibold">{r.name}</td>
                         <td className="px-4 py-3 text-muted-foreground">{r.game}</td>
-                        <td className="px-4 py-3 text-right tabular">{formatDuration(r.ms)}</td>
+                        <td className="px-4 py-3 text-right tabular">{formatDuration(r.totalMs)}</td>
+                        <td className="px-4 py-3 text-right tabular">{formatDuration(r.sitoutMs)}</td>
+                        <td className="px-4 py-3 text-right font-semibold tabular">{formatDuration(r.playMs)}</td>
                         <td className="px-4 py-3 text-right tabular">{r.n}</td>
                         <td className="px-4 py-3 text-right tabular">{r.players.size}</td>
                       </tr>
@@ -467,7 +520,9 @@ function SessionTable({
             <th className="px-4 py-3">Game</th>
             <th className="px-4 py-3">Seated</th>
             <th className="px-4 py-3">Left</th>
-            <th className="px-4 py-3 text-right">Duration</th>
+            <th className="px-4 py-3 text-right">Total time</th>
+            <th className="px-4 py-3 text-right">Sit-out</th>
+            <th className="px-4 py-3 text-right">Play time</th>
             <th className="w-12 px-2 py-3" />
           </tr>
         </thead>
@@ -479,7 +534,9 @@ function SessionTable({
               <td className="px-4 py-3 text-muted-foreground">{s.table.game_type}</td>
               <td className="whitespace-nowrap px-4 py-3 tabular">{formatDateTime(s.seated_at)}</td>
               <td className="whitespace-nowrap px-4 py-3 tabular">{formatDateTime(s.left_at)}</td>
-              <td className="px-4 py-3 text-right font-semibold tabular">{formatDuration(sessionMs(s.seated_at, s.left_at))}</td>
+              <td className="px-4 py-3 text-right tabular">{formatDuration(sessionMs(s.seated_at, s.left_at))}</td>
+              <td className="px-4 py-3 text-right tabular">{formatDuration(sitOutMs(s.sitouts))}</td>
+              <td className="px-4 py-3 text-right font-semibold tabular">{formatDuration(playMs(s.seated_at, s.left_at, s.sitouts))}</td>
               <td className="px-2 py-3 text-right">
   <Button
     size="icon"
