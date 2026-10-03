@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ArrowRightLeft, LogOut, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  LogOut,
+  Plus,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -115,15 +121,25 @@ function Dashboard() {
                 {/* Table header */}
                 <div className="border-b px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl font-bold">
-                        {table.name}
-                      </h2>
+                    <div className="flex min-w-0 items-center gap-3">
+  {/* Small poker-table visual */}
+  <div
+    className="flex h-9 w-14 shrink-0 items-center justify-center rounded-[50%] border-2 border-primary/25 bg-primary/10 text-[10px] font-bold tracking-wider text-primary"
+    aria-hidden="true"
+  >
+    ♠ ♥ ♦ ♣
+  </div>
 
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {table.game_type}
-                      </p>
-                    </div>
+  <div className="min-w-0">
+    <h2 className="truncate text-xl font-bold">
+      {table.name}
+    </h2>
+
+    <p className="mt-1 truncate text-sm text-muted-foreground">
+      {table.game_type}
+    </p>
+  </div>
+</div>
 
                     <div className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
                       {seatedPlayers.length}{" "}
@@ -146,13 +162,15 @@ function Dashboard() {
     className="rounded-lg bg-muted/50 px-3 py-3"
   >
     <div className="flex items-center justify-between gap-4">
-      <div className="min-w-0 flex items-center gap-2">
-        <span className="live-dot shrink-0" />
+<div className="min-w-0 flex items-center gap-2">
+  <span className="live-dot shrink-0" />
 
-        <span className="truncate font-semibold">
-          {session.player.full_name}
-        </span>
-      </div>
+  <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+
+  <span className="truncate font-semibold">
+    {session.player.full_name}
+  </span>
+</div>
 
       <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-success">
         {formatLiveDuration(
