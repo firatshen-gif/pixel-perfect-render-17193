@@ -486,7 +486,7 @@ function MovePlayerDialog({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setNewTableId("");
+          setNewTableId(session?.table.id ?? "");
           setNewSeatNumber("");
           setMovedAt(toLocalInput());
           setError(null);
