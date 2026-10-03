@@ -56,6 +56,38 @@ export type Database = {
           },
         ]
       }
+      session_sitouts: {
+        Row: {
+          created_at: string
+          id: string
+          play_session_id: string
+          sat_in_at: string | null
+          sat_out_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          play_session_id: string
+          sat_in_at?: string | null
+          sat_out_at: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          play_session_id?: string
+          sat_in_at?: string | null
+          sat_out_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_sitouts_play_session_id_fkey"
+            columns: ["play_session_id"]
+            isOneToOne: false
+            referencedRelation: "play_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           created_at: string
