@@ -13,6 +13,7 @@ export type PokerTable = {
   name: string;
   game_type_id: string | null;
   game_type: string;
+  sort_order: number;
   created_at: string;
 };
 
@@ -38,6 +39,7 @@ type RawPokerTable = {
   id: string;
   name: string;
   game_type_id: string | null;
+  sort_order: number;
   created_at: string;
   game_type_ref: { id: string; name: string; is_default?: boolean } | null;
 };
@@ -58,7 +60,7 @@ type RawSession = {
 };
 
 const TABLE_SELECT =
-  "id, name, created_at, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name, is_default)";
+  "id, name, created_at, game_type_id, sort_order, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name, is_default)";
 
 const SESSION_SELECT =
   "id, seated_at, left_at, seat_number, player:players!inner(id, full_name), table:poker_tables!inner(id, name, game_type_id, game_type_ref:game_types!poker_tables_game_type_id_fkey(id, name)), sitouts:session_sitouts(id, sat_out_at, sat_in_at)";
@@ -69,6 +71,7 @@ function normalizeTable(table: RawPokerTable): PokerTable {
     name: table.name,
     game_type_id: table.game_type_id,
     game_type: table.game_type_ref?.name ?? "Unknown game",
+    sort_order: table.sort_order,
     created_at: table.created_at,
   };
 }
@@ -116,6 +119,7 @@ export function useTables() {
         await supabase
           .from("poker_tables")
           .select(TABLE_SELECT)
+          .order("sort_order")
           .order("name"),
       ) as unknown as RawPokerTable[];
 
@@ -329,7 +333,21 @@ export function useSaveTable() {
             .eq("id", t.id),
         );
       } else {
-        check(await supabase.from("poker_tables").insert(payload));
+        const lastTable = check(
+          await supabase
+            .from("poker_tables")
+            .select("sort_order")
+            .order("sort_order", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ) as { sort_order: number } | null;
+
+        check(
+          await supabase.from("poker_tables").insert({
+            ...payload,
+            sort_order: (lastTable?.sort_order ?? 0) + 1,
+          }),
+        );
       }
     },
     onSuccess: inv,
@@ -349,6 +367,50 @@ export function useDeleteTable() {
           `This table has ${count} play session${count === 1 ? "" : "s"} on record and can't be deleted, to keep the history intact.`,
         );
       check(await supabase.from("poker_tables").delete().eq("id", id));
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useReorderTables() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const current = check(
+        await supabase
+          .from("poker_tables")
+          .select("id, sort_order")
+          .in("id", orderedIds),
+      ) as { id: string; sort_order: number }[];
+
+      const previousOrder = new Map(
+        current.map((table) => [table.id, table.sort_order]),
+      );
+
+      const updates = await Promise.all(
+        orderedIds.map((id, index) =>
+          supabase
+            .from("poker_tables")
+            .update({ sort_order: index + 1 })
+            .eq("id", id),
+        ),
+      );
+
+      const failed = updates.find((result) => result.error);
+
+      if (failed?.error) {
+        await Promise.all(
+          current.map((table) =>
+            supabase
+              .from("poker_tables")
+              .update({ sort_order: previousOrder.get(table.id) ?? table.sort_order })
+              .eq("id", table.id),
+          ),
+        );
+
+        throw new Error(failed.error.message);
+      }
     },
     onSuccess: inv,
   });
