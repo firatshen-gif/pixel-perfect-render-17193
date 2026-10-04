@@ -51,9 +51,10 @@ import {
 
 import {
   formatLiveDuration,
-  fromLocalInput,
+  localDateTimeEdited,
+  localDateTimeNow,
+  localDateTimeToIso,
   sessionMs,
-  toLocalInput,
   useNow,
 } from "@/lib/time";
 
@@ -869,7 +870,7 @@ function MovePlayerDialog({
 
   const [newTableId, setNewTableId] = useState("");
   const [newSeatNumber, setNewSeatNumber] = useState("");
-  const [movedAt, setMovedAt] = useState("");
+  const [movedAt, setMovedAt] = useState(() => localDateTimeNow());
   const [error, setError] = useState<string | null>(null);
 
   const tableOptions = (tables.data ?? []).map((table) => ({
@@ -905,7 +906,7 @@ function MovePlayerDialog({
         onOpenAutoFocus={() => {
           setNewTableId(session?.table.id ?? "");
           setNewSeatNumber("");
-          setMovedAt(toLocalInput());
+          setMovedAt(localDateTimeNow());
           setError(null);
         }}
       >
@@ -925,7 +926,7 @@ function MovePlayerDialog({
                 return;
               }
 
-              if (!isSameTable && !movedAt) {
+              if (!isSameTable && !movedAt.value) {
                 setError("Choose a move time");
                 return;
               }
@@ -943,7 +944,7 @@ function MovePlayerDialog({
                   new_table_id: newTableId,
                   new_seat_number: Number(newSeatNumber),
                   seated_at: session.seated_at,
-                  moved_at: fromLocalInput(movedAt),
+                  moved_at: localDateTimeToIso(movedAt),
                 },
                 {
                   onSuccess: () => {
@@ -1052,9 +1053,9 @@ function MovePlayerDialog({
                 <Input
                   id="dashboard_moved_at"
                   type="datetime-local"
-                  value={movedAt}
+                  value={movedAt.value}
                   onChange={(event) =>
-                    setMovedAt(event.target.value)
+                    setMovedAt(localDateTimeEdited(event.target.value))
                   }
                   className="h-12 text-base"
                 />
@@ -1102,7 +1103,7 @@ function SitOutDialog({
   onClose: () => void;
 }) {
   const sitOut = useSitOut();
-  const [satOutAt, setSatOutAt] = useState("");
+  const [satOutAt, setSatOutAt] = useState(() => localDateTimeNow());
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -1114,7 +1115,7 @@ function SitOutDialog({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setSatOutAt(toLocalInput());
+          setSatOutAt(localDateTimeNow());
           setError(null);
         }}
       >
@@ -1124,7 +1125,7 @@ function SitOutDialog({
             onSubmit={(event) => {
               event.preventDefault();
 
-              if (!satOutAt) {
+              if (!satOutAt.value) {
                 setError("Choose a sit-out time");
                 return;
               }
@@ -1133,7 +1134,7 @@ function SitOutDialog({
                 {
                   play_session_id: session.id,
                   seated_at: session.seated_at,
-                  sat_out_at: fromLocalInput(satOutAt),
+                  sat_out_at: localDateTimeToIso(satOutAt),
                 },
                 {
                   onSuccess: () => {
@@ -1157,8 +1158,10 @@ function SitOutDialog({
               <Input
                 id="dashboard_sat_out_at"
                 type="datetime-local"
-                value={satOutAt}
-                onChange={(event) => setSatOutAt(event.target.value)}
+                value={satOutAt.value}
+                onChange={(event) =>
+                  setSatOutAt(localDateTimeEdited(event.target.value))
+                }
                 className="h-12 text-base"
               />
             </div>
@@ -1190,7 +1193,7 @@ function SitInDialog({
   onClose: () => void;
 }) {
   const sitIn = useSitIn();
-  const [satInAt, setSatInAt] = useState("");
+  const [satInAt, setSatInAt] = useState(() => localDateTimeNow());
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -1202,7 +1205,7 @@ function SitInDialog({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setSatInAt(toLocalInput());
+          setSatInAt(localDateTimeNow());
           setError(null);
         }}
       >
@@ -1212,7 +1215,7 @@ function SitInDialog({
             onSubmit={(event) => {
               event.preventDefault();
 
-              if (!satInAt) {
+              if (!satInAt.value) {
                 setError("Choose a sit-in time");
                 return;
               }
@@ -1220,7 +1223,7 @@ function SitInDialog({
               sitIn.mutate(
                 {
                   play_session_id: session.id,
-                  sat_in_at: fromLocalInput(satInAt),
+                  sat_in_at: localDateTimeToIso(satInAt),
                 },
                 {
                   onSuccess: () => {
@@ -1244,8 +1247,10 @@ function SitInDialog({
               <Input
                 id="dashboard_sat_in_at"
                 type="datetime-local"
-                value={satInAt}
-                onChange={(event) => setSatInAt(event.target.value)}
+                value={satInAt.value}
+                onChange={(event) =>
+                  setSatInAt(localDateTimeEdited(event.target.value))
+                }
                 className="h-12 text-base"
               />
             </div>
@@ -1278,7 +1283,7 @@ function UnseatDialog({
 }) {
   const leave = useLeaveTable();
 
-  const [leftAt, setLeftAt] = useState("");
+  const [leftAt, setLeftAt] = useState(() => localDateTimeNow());
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -1290,7 +1295,7 @@ function UnseatDialog({
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setLeftAt(toLocalInput());
+          setLeftAt(localDateTimeNow());
           setError(null);
         }}
       >
@@ -1300,12 +1305,12 @@ function UnseatDialog({
             onSubmit={(event) => {
               event.preventDefault();
 
-              if (!leftAt) {
+              if (!leftAt.value) {
                 setError("Choose an unseat time");
                 return;
               }
 
-              const iso = fromLocalInput(leftAt);
+              const iso = localDateTimeToIso(leftAt);
 
               leave.mutate(
                 {
@@ -1345,9 +1350,9 @@ function UnseatDialog({
               <Input
                 id="dashboard_left_at"
                 type="datetime-local"
-                value={leftAt}
+                value={leftAt.value}
                 onChange={(event) =>
-                  setLeftAt(event.target.value)
+                  setLeftAt(localDateTimeEdited(event.target.value))
                 }
                 className="h-12 text-base"
               />
@@ -1464,7 +1469,7 @@ function SeatAtTableDialog({
   const seat = useSeatPlayer();
 
   const [playerId, setPlayerId] = useState("");
-  const [seatedAt, setSeatedAt] = useState(() => toLocalInput());
+  const [seatedAt, setSeatedAt] = useState(() => localDateTimeNow());
 
   const playerOptions = (players.data ?? []).map((player) => {
     const currentSession = active.data?.find(
@@ -1491,7 +1496,7 @@ function SeatAtTableDialog({
       return;
     }
 
-    if (!seatedAt) {
+    if (!seatedAt.value) {
       toast.error("Choose a seated time");
       return;
     }
@@ -1505,7 +1510,7 @@ function SeatAtTableDialog({
         player_id: playerId,
         table_id: table.id,
         seat_number: initialSeatNumber,
-        seated_at: fromLocalInput(seatedAt),
+        seated_at: localDateTimeToIso(seatedAt),
       },
       {
         onSuccess: () => {
@@ -1514,7 +1519,7 @@ function SeatAtTableDialog({
           );
 
           setPlayerId("");
-          setSeatedAt(toLocalInput());
+          setSeatedAt(localDateTimeNow());
           onClose();
         },
 
@@ -1535,7 +1540,7 @@ function SeatAtTableDialog({
       <DialogContent
         onOpenAutoFocus={() => {
           setPlayerId("");
-          setSeatedAt(toLocalInput());
+          setSeatedAt(localDateTimeNow());
         }}
       >
         {table && initialSeatNumber != null && (
@@ -1580,9 +1585,9 @@ function SeatAtTableDialog({
               <Input
                 id="dashboard_seated_at"
                 type="datetime-local"
-                value={seatedAt}
+                value={seatedAt.value}
                 onChange={(event) =>
-                  setSeatedAt(event.target.value)
+                  setSeatedAt(localDateTimeEdited(event.target.value))
                 }
                 className="h-12 text-base"
               />
