@@ -7,6 +7,7 @@ import {
   Pause,
   Play,
   Plus,
+  Search,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -124,6 +125,10 @@ function Dashboard() {
   const [sittingOutSession, setSittingOutSession] = useState<Session | null>(null);
   const [sittingInSession, setSittingInSession] = useState<Session | null>(null);
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
+  const [dashboardView, setDashboardView] = useState<"compact" | "detailed">("compact");
+  const [playerSearch, setPlayerSearch] = useState("");
+
+  const normalizedSearch = playerSearch.trim().toLowerCase();
 
   const handleDragStart = (event: DragStartEvent) => {
     const sessionId = event.active.data.current?.sessionId as string | undefined;
@@ -213,6 +218,42 @@ function Dashboard() {
         subtitle="Live tournament floor"
       />
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2.5">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={playerSearch}
+            onChange={(event) => setPlayerSearch(event.target.value)}
+            placeholder="Search player…"
+            className="h-10 pl-9"
+          />
+        </div>
+
+        <div
+          className="inline-flex rounded-lg border bg-muted/40 p-1"
+          aria-label="Dashboard view"
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant={dashboardView === "compact" ? "default" : "ghost"}
+            className="h-8"
+            onClick={() => setDashboardView("compact")}
+          >
+            Compact
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={dashboardView === "detailed" ? "default" : "ghost"}
+            className="h-8"
+            onClick={() => setDashboardView("detailed")}
+          >
+            Detailed
+          </Button>
+        </div>
+      </div>
+
       {!tables.data?.length ? (
         <Empty>No tables have been created yet.</Empty>
       ) : (
@@ -222,7 +263,13 @@ function Dashboard() {
           onDragEnd={handleDragEnd}
           onDragCancel={() => setDraggedSession(null)}
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            className={
+              dashboardView === "compact"
+                ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            }
+          >
           {tables.data.map((table) => {
             const seatedPlayers = (active.data ?? []).filter(
               (session) => session.table.id === table.id,
@@ -234,11 +281,26 @@ function Dashboard() {
             const unassignedPlayers = seatedPlayers.filter(
               (session) => session.seat_number == null,
             );
+            const tableMatchesSearch =
+              !normalizedSearch ||
+              seatedPlayers.some((session) =>
+                session.player.full_name
+                  .toLowerCase()
+                  .includes(normalizedSearch),
+              );
 
             return (
               <div
                 key={table.id}
-                className="flex flex-col rounded-xl border bg-card shadow-sm"
+                className={`flex flex-col rounded-xl border bg-card shadow-sm transition-opacity ${
+                  normalizedSearch && !tableMatchesSearch
+                    ? "opacity-35"
+                    : ""
+                } ${
+                  normalizedSearch && tableMatchesSearch
+                    ? "ring-1 ring-primary/30"
+                    : ""
+                }`}
               >
                 {/* Table header */}
                 <div className="border-b px-4 py-2.5">
@@ -312,8 +374,14 @@ function Dashboard() {
                 </div>
 
                 {/* Seats 1-12 */}
-                <div className="flex-1 p-2">
-                  <div className="divide-y overflow-hidden rounded-lg border">
+                <div className={dashboardView === "compact" ? "flex-1 p-1.5" : "flex-1 p-2"}>
+                  <div
+                    className={
+                      dashboardView === "compact"
+                        ? "grid grid-flow-col grid-cols-2 grid-rows-6 gap-px overflow-hidden rounded-lg border bg-border"
+                        : "divide-y overflow-hidden rounded-lg border"
+                    }
+                  >
                     {Array.from({ length: 12 }, (_, index) => index + 1).map(
                       (seatNumber) => {
                         const session = seatedPlayers.find(
@@ -321,6 +389,12 @@ function Dashboard() {
                         );
 
                         if (session) {
+                          const nameMatches =
+                            !normalizedSearch ||
+                            session.player.full_name
+                              .toLowerCase()
+                              .includes(normalizedSearch);
+
                           return (
                             <SeatDropTarget
                               key={seatNumber}
@@ -332,6 +406,9 @@ function Dashboard() {
                                 session={session}
                                 seatNumber={seatNumber}
                                 now={now}
+                                compact={dashboardView === "compact"}
+                                dimmed={!!normalizedSearch && !nameMatches}
+                                highlighted={!!normalizedSearch && nameMatches}
                                 dragDisabled={dragMovePlayer.isPending}
                                 onSitOut={() => setSittingOutSession(session)}
                                 onSitIn={() => setSittingInSession(session)}
@@ -351,17 +428,33 @@ function Dashboard() {
                           >
                             <button
                               type="button"
-                              className="flex min-h-9 w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
+                              className={`flex w-full items-center gap-2 bg-card text-left text-muted-foreground transition hover:bg-muted/60 hover:text-foreground ${
+                                dashboardView === "compact"
+                                  ? "min-h-8 px-1.5 py-1 text-xs"
+                                  : "min-h-9 px-2 py-1.5 text-sm"
+                              }`}
                               onClick={() => {
                                 setSeatingTable(table);
                                 setSeatingSeatNumber(seatNumber);
                               }}
                             >
-                              <span className="w-8 shrink-0 text-xs font-bold tabular-nums">
+                              <span
+                                className={`shrink-0 font-bold tabular-nums ${
+                                  dashboardView === "compact"
+                                    ? "w-7 text-[11px]"
+                                    : "w-8 text-xs"
+                                }`}
+                              >
                                 #{seatNumber}
                               </span>
-                              <span className="flex-1">Empty</span>
-                              <Plus className="h-3.5 w-3.5 opacity-50" />
+                              <span className="flex-1 truncate">Empty</span>
+                              <Plus
+                                className={
+                                  dashboardView === "compact"
+                                    ? "h-3 w-3 opacity-40"
+                                    : "h-3.5 w-3.5 opacity-50"
+                                }
+                              />
                             </button>
                           </SeatDropTarget>
                         );
@@ -374,21 +467,32 @@ function Dashboard() {
                       <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Unassigned seat
                       </div>
-                      <div className="divide-y">
-                        {unassignedPlayers.map((session) => (
-                          <DraggablePlayerRow
-                            key={session.id}
-                            session={session}
-                            seatNumber={null}
-                            now={now}
-                            dragDisabled={dragMovePlayer.isPending}
-                            onSitOut={() => setSittingOutSession(session)}
-                            onSitIn={() => setSittingInSession(session)}
-                            onMove={() => setMovingSession(session)}
-                            onUnseat={() => setLeavingSession(session)}
-                            onDelete={() => setDeletingSession(session)}
-                          />
-                        ))}
+                      <div className={dashboardView === "compact" ? "grid grid-cols-2 gap-px bg-border" : "divide-y"}>
+                        {unassignedPlayers.map((session) => {
+                          const nameMatches =
+                            !normalizedSearch ||
+                            session.player.full_name
+                              .toLowerCase()
+                              .includes(normalizedSearch);
+
+                          return (
+                            <DraggablePlayerRow
+                              key={session.id}
+                              session={session}
+                              seatNumber={null}
+                              now={now}
+                              compact={dashboardView === "compact"}
+                              dimmed={!!normalizedSearch && !nameMatches}
+                              highlighted={!!normalizedSearch && nameMatches}
+                              dragDisabled={dragMovePlayer.isPending}
+                              onSitOut={() => setSittingOutSession(session)}
+                              onSitIn={() => setSittingInSession(session)}
+                              onMove={() => setMovingSession(session)}
+                              onUnseat={() => setLeavingSession(session)}
+                              onDelete={() => setDeletingSession(session)}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -491,6 +595,9 @@ function DraggablePlayerRow({
   session,
   seatNumber,
   now,
+  compact = false,
+  dimmed = false,
+  highlighted = false,
   dragDisabled,
   onSitOut,
   onSitIn,
@@ -501,6 +608,9 @@ function DraggablePlayerRow({
   session: Session;
   seatNumber: number | null;
   now: number;
+  compact?: boolean;
+  dimmed?: boolean;
+  highlighted?: boolean;
   dragDisabled: boolean;
   onSitOut: () => void;
   onSitIn: () => void;
@@ -529,11 +639,17 @@ function DraggablePlayerRow({
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-9 items-center gap-1.5 px-2 py-1.5 transition-opacity ${
-        openSitout ? "bg-amber-400/10" : "bg-emerald-500/8"
-      } ${isDragging ? "opacity-35" : ""}`}
+      className={`flex items-center gap-1.5 transition-all ${
+        compact ? "min-h-8 px-1.5 py-1" : "min-h-9 px-2 py-1.5"
+      } ${openSitout ? "bg-amber-400/10" : "bg-emerald-500/8"} ${
+        isDragging || dimmed ? "opacity-35" : ""
+      } ${highlighted ? "ring-1 ring-inset ring-primary/50" : ""}`}
     >
-      <span className="w-8 shrink-0 text-xs font-bold tabular-nums text-muted-foreground">
+      <span
+        className={`shrink-0 font-bold tabular-nums text-muted-foreground ${
+          compact ? "w-7 text-[11px]" : "w-8 text-xs"
+        }`}
+      >
         {seatNumber ? `#${seatNumber}` : "—"}
       </span>
 
@@ -542,7 +658,9 @@ function DraggablePlayerRow({
           <TooltipTrigger asChild>
             <button
               type="button"
-              className="flex h-7 w-6 shrink-0 touch-none cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+              className={`flex shrink-0 touch-none cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 ${
+                compact ? "h-6 w-5" : "h-7 w-6"
+              }`}
               disabled={dragDisabled}
               aria-label={`Drag ${session.player.full_name} to another seat`}
               {...attributes}
@@ -579,19 +697,24 @@ function DraggablePlayerRow({
             <span className="live-dot shrink-0" />
           )}
 
-          <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          {!compact && (
+            <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          )}
 
-          <span className="truncate text-sm font-semibold">
+          <span className={`truncate font-semibold ${compact ? "text-xs" : "text-sm"}`}>
             {session.player.full_name}
           </span>
         </div>
 
-        <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-success">
-          {formatLiveDuration(
-            sessionMs(session.seated_at, null, now),
-          )}
-        </span>
+        {!compact && (
+          <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-success">
+            {formatLiveDuration(
+              sessionMs(session.seated_at, null, now),
+            )}
+          </span>
+        )}
 
+        {!compact && (
         <div className="flex shrink-0 items-center gap-1">
           {openSitout ? (
             <Tooltip>
@@ -672,6 +795,7 @@ function DraggablePlayerRow({
             <TooltipContent side="top">Delete session</TooltipContent>
           </Tooltip>
         </div>
+        )}
       </TooltipProvider>
     </div>
   );
