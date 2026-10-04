@@ -115,7 +115,6 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const tables = useTables();
   const active = useActiveSessions();
-  const players = usePlayers();
   const dragMovePlayer = useMovePlayer();
 
   // Update the visible session timers every second.
@@ -143,16 +142,18 @@ function Dashboard() {
   const activeTableCount = new Set(
     (active.data ?? []).map((session) => session.table.id),
   ).size;
-  const activePlayerCount = new Set(
+  const totalPlayerCount = new Set(
     (active.data ?? []).map((session) => session.player.id),
   ).size;
-  const sittingOutCount = new Set(
+  const sittingOutPlayerIds = new Set(
     (active.data ?? [])
       .filter((session) =>
         session.sitouts.some((sitout) => !sitout.sat_in_at),
       )
       .map((session) => session.player.id),
-  ).size;
+  );
+  const sittingOutCount = sittingOutPlayerIds.size;
+  const activePlayerCount = totalPlayerCount - sittingOutCount;
 
   const handleDragStart = (event: DragStartEvent) => {
     const sessionId = event.active.data.current?.sessionId as string | undefined;
@@ -223,7 +224,7 @@ function Dashboard() {
     );
   };
 
-  if (tables.isLoading || active.isLoading || players.isLoading) {
+  if (tables.isLoading || active.isLoading) {
     return <Loading />;
   }
 
@@ -265,7 +266,7 @@ function Dashboard() {
               Players
             </span>
             <span className="text-sm font-bold tabular-nums">
-              {players.data?.length ?? 0}
+              {totalPlayerCount}
             </span>
           </div>
           <div className="flex items-baseline gap-1 px-2">
