@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
+  Armchair,
   ArrowRightLeft,
   EllipsisVertical,
   GripVertical,
@@ -1129,7 +1130,7 @@ function WaitlistPlayerRow({
               onClick={onSeat}
               aria-label={`Seat ${entry.player.full_name}`}
             >
-              <Play className="h-3.5 w-3.5" />
+              <Armchair className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top">Seat Player</TooltipContent>
