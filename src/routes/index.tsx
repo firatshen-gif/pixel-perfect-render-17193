@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRightLeft,
+  EllipsisVertical,
   GripVertical,
   LogOut,
   Pause,
@@ -66,6 +67,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -706,12 +714,59 @@ function DraggablePlayerRow({
           </span>
         </div>
 
-        {!compact && (
-          <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-success">
-            {formatLiveDuration(
-              sessionMs(session.seated_at, null, now),
-            )}
-          </span>
+        <span
+          className={`shrink-0 font-mono font-bold tabular-nums text-success ${
+            compact ? "text-[9px] tracking-tight" : "text-xs"
+          }`}
+          title="Session duration"
+        >
+          {formatLiveDuration(
+            sessionMs(session.seated_at, null, now),
+          )}
+        </span>
+
+        {compact && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label={`Actions for ${session.player.full_name}`}
+              >
+                <EllipsisVertical className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={openSitout ? onSitIn : onSitOut}>
+                {openSitout ? (
+                  <Play className="h-4 w-4" />
+                ) : (
+                  <Pause className="h-4 w-4" />
+                )}
+                {openSitout ? "Sit In" : "Sit Out"}
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onSelect={onMove}>
+                <ArrowRightLeft className="h-4 w-4" />
+                Move / Change seat
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onSelect={onUnseat}>
+                <LogOut className="h-4 w-4" />
+                Unseat
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onSelect={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete session
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {!compact && (
