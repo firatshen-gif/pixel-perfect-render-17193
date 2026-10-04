@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  Armchair,
   BarChart3,
   Grid3x3,
   LayoutDashboard,
@@ -17,7 +16,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/sessions", label: "Seating", icon: Armchair },
   { to: "/tables", label: "Tables", icon: Grid3x3 },
   { to: "/game-types", label: "Game Types", icon: Tags },
   { to: "/players", label: "Players", icon: Users },
