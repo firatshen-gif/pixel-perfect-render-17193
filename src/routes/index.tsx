@@ -699,7 +699,11 @@ function DraggablePlayerRow({
       ref={setNodeRef}
       className={`flex items-center gap-1.5 transition-all ${
         compact ? "min-h-8 px-1.5 py-1" : "min-h-9 px-2 py-1.5"
-      } ${openSitout ? "bg-amber-400/10" : "bg-emerald-500/8"} ${
+      } ${
+        openSitout
+          ? "bg-amber-50 dark:bg-amber-400/10"
+          : "bg-emerald-50 dark:bg-emerald-400/10"
+      } ${
         isDragging || dimmed ? "opacity-35" : ""
       } ${highlighted ? "ring-1 ring-inset ring-primary/50" : ""}`}
     >
