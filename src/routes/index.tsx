@@ -771,7 +771,7 @@ function Dashboard() {
                               >
                                 #{seatNumber}
                               </span>
-                              <span className="flex-1 truncate">Empty</span>
+                              <span className="flex-1" aria-hidden="true" />
                               <Plus
                                 className={
                                   dashboardView === "compact"
