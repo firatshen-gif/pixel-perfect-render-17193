@@ -59,7 +59,7 @@ import {
 } from "@/lib/time";
 
 import { Combobox } from "@/components/Combobox";
-import { Empty, Loading, PageHeader } from "@/components/ui-bits";
+import { Empty, Loading } from "@/components/ui-bits";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -224,24 +224,11 @@ function Dashboard() {
   };
 
   if (tables.isLoading || active.isLoading || players.isLoading) {
-    return (
-      <>
-        <PageHeader
-          title="Dashboard"
-          subtitle="Live tournament floor"
-        />
-        <Loading />
-      </>
-    );
+    return <Loading />;
   }
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Live tournament floor"
-      />
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2.5">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
