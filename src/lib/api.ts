@@ -660,6 +660,19 @@ export function useSeatPlayer() {
 
         throw new Error(res.error.message);
       }
+
+      // If the player was waiting, seating them anywhere should remove the
+      // stale waitlist entry so the two states can never remain out of sync.
+      const waitlistCleanup = await supabase
+        .from("waitlist")
+        .delete()
+        .eq("player_id", s.player_id);
+
+      if (waitlistCleanup.error) {
+        throw new Error(
+          `Player was seated, but the waitlist entry could not be removed: ${waitlistCleanup.error.message}`,
+        );
+      }
     },
     onSuccess: inv,
   });
