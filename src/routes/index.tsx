@@ -1282,37 +1282,30 @@ function WaitlistPlayerRow({
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-8 items-center gap-1.5 px-2 py-1 transition-opacity ${
-        isDragging ? "opacity-35" : ""
+      className={`flex min-h-8 touch-none items-center gap-1.5 px-2 py-1 transition-opacity ${
+        dragDisabled
+          ? "cursor-not-allowed"
+          : isDragging
+            ? "cursor-grabbing opacity-35"
+            : "cursor-grab"
       }`}
+      aria-label={`Drag ${entry.player.full_name} to an empty seat`}
+      {...attributes}
+      {...listeners}
     >
       <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold tabular-nums text-muted-foreground">
         {position}
       </span>
 
       <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="flex h-6 w-5 shrink-0 touch-none cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={dragDisabled}
-              aria-label={`Drag ${entry.player.full_name} to an empty seat`}
-              {...attributes}
-              {...listeners}
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            Drag to an empty seat
-          </TooltipContent>
-        </Tooltip>
-
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">
           {entry.player.full_name}
         </span>
 
+        <div
+          className="flex shrink-0 items-center gap-1"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -1345,6 +1338,7 @@ function WaitlistPlayerRow({
           </TooltipTrigger>
           <TooltipContent side="top">Remove from waitlist</TooltipContent>
         </Tooltip>
+        </div>
       </TooltipProvider>
     </div>
   );
@@ -1433,7 +1427,7 @@ function DraggablePlayerRow({
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-center transition-all ${
+      className={`flex touch-none items-center transition-all ${
         compact
           ? "min-h-8 gap-[3px] px-1.5 py-1"
           : "min-h-9 gap-1.5 px-2 py-1.5"
@@ -1442,8 +1436,17 @@ function DraggablePlayerRow({
           ? "bg-amber-50 dark:bg-amber-400/10"
           : "bg-emerald-50 dark:bg-emerald-400/10"
       } ${
-        isDragging || dimmed ? "opacity-35" : ""
-      } ${highlighted ? "ring-1 ring-inset ring-primary/50" : ""}`}
+        dragDisabled
+          ? "cursor-not-allowed"
+          : isDragging
+            ? "cursor-grabbing opacity-35"
+            : "cursor-grab"
+      } ${dimmed ? "opacity-35" : ""} ${
+        highlighted ? "ring-1 ring-inset ring-primary/50" : ""
+      }`}
+      aria-label={`Drag ${session.player.full_name} to another seat`}
+      {...attributes}
+      {...listeners}
     >
       <span
         className={`shrink-0 font-bold tabular-nums ${
@@ -1463,26 +1466,6 @@ function DraggablePlayerRow({
       </span>
 
       <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className={`flex shrink-0 touch-none cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 ${
-                compact ? "h-6 w-5" : "h-7 w-6"
-              }`}
-              disabled={dragDisabled}
-              aria-label={`Drag ${session.player.full_name} to another seat`}
-              {...attributes}
-              {...listeners}
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            Drag to another empty seat
-          </TooltipContent>
-        </Tooltip>
-
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {!compact && (
             <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -1505,6 +1488,7 @@ function DraggablePlayerRow({
         </span>
 
         {compact && (
+          <div onPointerDown={(event) => event.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -1546,10 +1530,14 @@ function DraggablePlayerRow({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         )}
 
         {!compact && (
-        <div className="flex shrink-0 items-center gap-1">
+        <div
+          className="flex shrink-0 items-center gap-1"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
           {openSitout ? (
             <Tooltip>
               <TooltipTrigger asChild>
