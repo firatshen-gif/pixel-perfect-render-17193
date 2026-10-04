@@ -2,14 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRightLeft,
+  Clock3,
   EllipsisVertical,
   GripVertical,
   LogOut,
+  PanelRightClose,
+  PanelRightOpen,
   Pause,
   Play,
   Plus,
   Search,
   Trash2,
+  UserPlus,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,19 +41,25 @@ import {
 
 import {
   useActiveSessions,
+  useAddToWaitlist,
   useDeleteSession,
   useLeaveTable,
   useMovePlayer,
   usePlayers,
+  useRemoveFromWaitlist,
+  useSeatFromWaitlist,
   useSeatPlayer,
   useSitIn,
   useSitOut,
   useTables,
+  useWaitlist,
   type PokerTable,
   type Session,
+  type WaitlistEntry,
 } from "@/lib/api";
 
 import {
+  formatDuration,
   formatLiveDuration,
   localDateTimeEdited,
   localDateTimeNow,
@@ -115,6 +125,7 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const tables = useTables();
   const active = useActiveSessions();
+  const waitlist = useWaitlist();
   const dragMovePlayer = useMovePlayer();
 
   // Update the visible session timers every second.
@@ -136,6 +147,7 @@ function Dashboard() {
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
   const [dashboardView, setDashboardView] = useState<"compact" | "detailed">("compact");
   const [playerSearch, setPlayerSearch] = useState("");
+  const [waitlistOpen, setWaitlistOpen] = useState(true);
 
   const normalizedSearch = playerSearch.trim().toLowerCase();
 
@@ -288,35 +300,57 @@ function Dashboard() {
           </div>
         </div>
 
-        <div
-          className="inline-flex rounded-lg border bg-muted/40 p-1"
-          aria-label="Dashboard view"
-        >
+        <div className="flex items-center gap-2">
+          <div
+            className="inline-flex rounded-lg border bg-muted/40 p-1"
+            aria-label="Dashboard view"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={dashboardView === "compact" ? "default" : "ghost"}
+              className="h-8"
+              onClick={() => setDashboardView("compact")}
+            >
+              Compact
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={dashboardView === "detailed" ? "default" : "ghost"}
+              className="h-8"
+              onClick={() => setDashboardView("detailed")}
+            >
+              Detailed
+            </Button>
+          </div>
+
           <Button
             type="button"
             size="sm"
-            variant={dashboardView === "compact" ? "default" : "ghost"}
-            className="h-8"
-            onClick={() => setDashboardView("compact")}
+            variant="outline"
+            className="h-10 gap-2"
+            onClick={() => setWaitlistOpen((open) => !open)}
           >
-            Compact
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={dashboardView === "detailed" ? "default" : "ghost"}
-            className="h-8"
-            onClick={() => setDashboardView("detailed")}
-          >
-            Detailed
+            {waitlistOpen ? (
+              <PanelRightClose className="h-4 w-4" />
+            ) : (
+              <PanelRightOpen className="h-4 w-4" />
+            )}
+            <span>Waitlist</span>
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
+              {waitlist.data?.length ?? 0}
+            </span>
           </Button>
         </div>
       </div>
 
-      {!tables.data?.length ? (
-        <Empty>No tables have been created yet.</Empty>
-      ) : (
-        <DndContext
+      <div className="flex flex-col items-start gap-4 xl:flex-row">
+        <div className="w-full min-w-0 flex-1">
+          {!tables.data?.length ? (
+            <Empty>No tables have been created yet.</Empty>
+          ) : (
+            <DndContext
           sensors={dragSensors}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -580,8 +614,22 @@ function Dashboard() {
               </div>
             ) : null}
           </DragOverlay>
-        </DndContext>
-      )}
+            </DndContext>
+          )}
+        </div>
+
+        {waitlistOpen && (
+          <aside className="order-first w-full shrink-0 xl:order-last xl:sticky xl:top-20 xl:w-72">
+            <WaitlistPanel
+              entries={waitlist.data ?? []}
+              activeSessions={active.data ?? []}
+              tables={tables.data ?? []}
+              now={now}
+              loading={waitlist.isLoading}
+            />
+          </aside>
+        )}
+      </div>
 
       <SeatAtTableDialog
         table={seatingTable}
@@ -615,6 +663,352 @@ function Dashboard() {
     </>
   );
 }
+function WaitlistPanel({
+  entries,
+  activeSessions,
+  tables,
+  now,
+  loading,
+}: {
+  entries: WaitlistEntry[];
+  activeSessions: Session[];
+  tables: PokerTable[];
+  now: number;
+  loading: boolean;
+}) {
+  const players = usePlayers();
+  const addToWaitlist = useAddToWaitlist();
+  const removeFromWaitlist = useRemoveFromWaitlist();
+  const seatFromWaitlist = useSeatFromWaitlist();
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [playerId, setPlayerId] = useState("");
+  const [seatingEntry, setSeatingEntry] = useState<WaitlistEntry | null>(null);
+  const [tableId, setTableId] = useState("");
+  const [seatNumber, setSeatNumber] = useState("");
+
+  const activePlayerIds = new Set(
+    activeSessions.map((session) => session.player.id),
+  );
+  const waitlistedPlayerIds = new Set(entries.map((entry) => entry.player_id));
+
+  const playerOptions = (players.data ?? [])
+    .filter(
+      (player) =>
+        !activePlayerIds.has(player.id) &&
+        !waitlistedPlayerIds.has(player.id),
+    )
+    .map((player) => ({
+      value: player.id,
+      label: player.full_name,
+    }));
+
+  const selectedTable = tables.find((table) => table.id === tableId);
+  const occupiedSeats = new Set(
+    activeSessions
+      .filter((session) => session.table.id === tableId)
+      .map((session) => session.seat_number)
+      .filter((seat): seat is number => seat != null),
+  );
+  const availableSeats = Array.from({ length: 12 }, (_, index) => index + 1)
+    .filter((seat) => !occupiedSeats.has(seat));
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold">Waitlist</h2>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold tabular-nums">
+                {entries.length}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Oldest entry first
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 shrink-0"
+            onClick={() => {
+              setPlayerId("");
+              setAddOpen(true);
+            }}
+          >
+            <UserPlus className="h-4 w-4" />
+            Add
+          </Button>
+        </div>
+
+        <div className="max-h-[calc(100vh-11rem)] overflow-y-auto">
+          {loading ? (
+            <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+              Loading waitlist…
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="px-3 py-8 text-center">
+              <p className="text-sm font-medium">Nobody is waiting</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Add a player when they are waiting for a seat.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {entries.map((entry, index) => (
+                <div key={entry.id} className="px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold tabular-nums text-muted-foreground">
+                      {index + 1}
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {entry.player.full_name}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Clock3 className="h-3 w-3" />
+                        Waiting {formatDuration(now - new Date(entry.added_at).getTime())}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        setTableId("");
+                        setSeatNumber("");
+                        setSeatingEntry(entry);
+                      }}
+                    >
+                      Seat
+                    </Button>
+
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={removeFromWaitlist.isPending}
+                      onClick={() => {
+                        removeFromWaitlist.mutate(entry.id, {
+                          onSuccess: () =>
+                            toast.success(
+                              `${entry.player.full_name} removed from waitlist`,
+                            ),
+                          onError: (error) => toast.error(error.message),
+                        });
+                      }}
+                      aria-label={`Remove ${entry.player.full_name} from waitlist`}
+                      title="Remove from waitlist"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (!playerId) {
+                toast.error("Choose a player");
+                return;
+              }
+
+              const playerName = players.data?.find(
+                (player) => player.id === playerId,
+              )?.full_name;
+
+              addToWaitlist.mutate(playerId, {
+                onSuccess: () => {
+                  toast.success(`${playerName ?? "Player"} added to waitlist`);
+                  setPlayerId("");
+                  setAddOpen(false);
+                },
+                onError: (error) => toast.error(error.message),
+              });
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Add to waitlist</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                Seated players and players already waiting are excluded.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <Label>Player</Label>
+              <Combobox
+                value={playerId}
+                onChange={setPlayerId}
+                placeholder="Search player…"
+                searchPlaceholder="Search player…"
+                options={playerOptions}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={addToWaitlist.isPending || !playerId}
+              >
+                {addToWaitlist.isPending ? "Adding…" : "Add to Waitlist"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!seatingEntry}
+        onOpenChange={(open) => {
+          if (!open) setSeatingEntry(null);
+        }}
+      >
+        <DialogContent>
+          {seatingEntry && (
+            <form
+              className="space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+
+                if (!tableId) {
+                  toast.error("Choose a table");
+                  return;
+                }
+
+                if (!seatNumber) {
+                  toast.error("Choose a seat");
+                  return;
+                }
+
+                const parsedSeat = Number(seatNumber);
+
+                seatFromWaitlist.mutate(
+                  {
+                    waitlist_id: seatingEntry.id,
+                    player_id: seatingEntry.player_id,
+                    table_id: tableId,
+                    seat_number: parsedSeat,
+                    seated_at: new Date().toISOString(),
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success(
+                        `${seatingEntry.player.full_name} seated at ${selectedTable?.name ?? "table"} · Seat #${parsedSeat}`,
+                      );
+                      setSeatingEntry(null);
+                      setTableId("");
+                      setSeatNumber("");
+                    },
+                    onError: (error) => toast.error(error.message),
+                  },
+                );
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>
+                  Seat {seatingEntry.player.full_name}
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  Choose an available table and seat.
+                </p>
+              </DialogHeader>
+
+              <div className="space-y-2">
+                <Label>Table</Label>
+                <Select
+                  value={tableId}
+                  onValueChange={(value) => {
+                    setTableId(value);
+                    setSeatNumber("");
+                  }}
+                >
+                  <SelectTrigger className="h-12 text-base">
+                    <SelectValue placeholder="Choose table…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tables.map((table) => (
+                      <SelectItem key={table.id} value={table.id}>
+                        {table.name} · {table.game_type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Seat</Label>
+                <Select
+                  value={seatNumber}
+                  onValueChange={setSeatNumber}
+                  disabled={!tableId || availableSeats.length === 0}
+                >
+                  <SelectTrigger className="h-12 text-base">
+                    <SelectValue
+                      placeholder={
+                        !tableId
+                          ? "Choose a table first…"
+                          : availableSeats.length
+                            ? "Choose seat…"
+                            : "No empty seats"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSeats.map((seat) => (
+                      <SelectItem key={seat} value={String(seat)}>
+                        Seat #{seat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSeatingEntry(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    seatFromWaitlist.isPending || !tableId || !seatNumber
+                  }
+                >
+                  {seatFromWaitlist.isPending ? "Seating…" : "Seat Player"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function SeatDropTarget({
   tableId,
   seatNumber,
