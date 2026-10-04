@@ -37,7 +37,7 @@ export function AppNav() {
 
   return (
     <header className="sticky top-0 z-40 bg-felt text-felt-foreground shadow-md">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2">
+      <div className="mx-auto flex max-w-[100rem] items-center gap-4 px-4 py-2">
         <Link to="/" className="flex items-center gap-2 py-2 font-extrabold tracking-tight">
           <span className="grid h-9 w-9 place-items-center rounded-md bg-accent text-accent-foreground">
             <Spade className="h-5 w-5" />
