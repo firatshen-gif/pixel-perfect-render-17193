@@ -101,6 +101,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const GAME_TYPE_STYLES = [
+  {
+    header: "bg-sky-50/80 dark:bg-sky-500/10",
+    dot: "bg-sky-500",
+  },
+  {
+    header: "bg-amber-50/80 dark:bg-amber-500/10",
+    dot: "bg-amber-500",
+  },
+  {
+    header: "bg-violet-50/80 dark:bg-violet-500/10",
+    dot: "bg-violet-500",
+  },
+  {
+    header: "bg-rose-50/80 dark:bg-rose-500/10",
+    dot: "bg-rose-500",
+  },
+  {
+    header: "bg-teal-50/80 dark:bg-teal-500/10",
+    dot: "bg-teal-500",
+  },
+] as const;
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -169,6 +192,21 @@ function Dashboard() {
   );
   const sittingOutCount = sittingOutPlayerIds.size;
   const activePlayerCount = totalPlayerCount - sittingOutCount;
+
+  const sortedGameTypes = Array.from(
+    new Set((tables.data ?? []).map((table) => table.game_type)),
+  ).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
+
+  const gameTypeStyleByName = new Map(
+    sortedGameTypes.map((gameType, index) => [
+      gameType,
+      GAME_TYPE_STYLES[
+        Math.min(index, GAME_TYPE_STYLES.length - 1)
+      ]!,
+    ]),
+  );
 
   const handleDragStart = (event: DragStartEvent) => {
     const kind = event.active.data.current?.["kind"];
@@ -449,6 +487,10 @@ function Dashboard() {
             }
           >
           {tables.data.map((table) => {
+            const gameTypeStyle =
+              gameTypeStyleByName.get(table.game_type) ??
+              GAME_TYPE_STYLES[GAME_TYPE_STYLES.length - 1]!;
+
             const seatedPlayers = (active.data ?? []).filter(
               (session) => session.table.id === table.id,
             );
@@ -481,7 +523,7 @@ function Dashboard() {
                 }`}
               >
                 {/* Table header */}
-                <div className="border-b px-4 py-2.5">
+                <div className={`border-b px-4 py-2.5 ${gameTypeStyle.header}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-baseline gap-2">
                       <h2 className="truncate text-base font-bold">
@@ -495,8 +537,12 @@ function Dashboard() {
                         ·
                       </span>
 
-                      <span className="truncate text-sm text-muted-foreground">
-                        {table.game_type}
+                      <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground">
+                        <span
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${gameTypeStyle.dot}`}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{table.game_type}</span>
                       </span>
                     </div>
 
