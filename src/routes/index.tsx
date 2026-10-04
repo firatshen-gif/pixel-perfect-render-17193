@@ -626,6 +626,7 @@ function Dashboard() {
               tables={tables.data ?? []}
               now={now}
               loading={waitlist.isLoading}
+              error={waitlist.error?.message ?? null}
             />
           </aside>
         )}
@@ -669,12 +670,14 @@ function WaitlistPanel({
   tables,
   now,
   loading,
+  error,
 }: {
   entries: WaitlistEntry[];
   activeSessions: Session[];
   tables: PokerTable[];
   now: number;
   loading: boolean;
+  error: string | null;
 }) {
   const players = usePlayers();
   const addToWaitlist = useAddToWaitlist();
@@ -747,6 +750,13 @@ function WaitlistPanel({
           {loading ? (
             <div className="px-3 py-8 text-center text-sm text-muted-foreground">
               Loading waitlist…
+            </div>
+          ) : error ? (
+            <div className="px-3 py-6 text-center">
+              <p className="text-sm font-medium text-destructive">
+                Could not load waitlist
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{error}</p>
             </div>
           ) : entries.length === 0 ? (
             <div className="px-3 py-8 text-center">
