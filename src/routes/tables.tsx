@@ -1,12 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { z } from "zod";
 import {
   useActiveSessions,
   useDeleteTable,
   useGameTypes,
+  useReorderTables,
   useSaveTable,
   useTables,
   type PokerTable,
@@ -52,10 +63,54 @@ function TablesPage() {
   const tables = useTables();
   const active = useActiveSessions();
   const del = useDeleteTable();
+  const reorder = useReorderTables();
   const [editing, setEditing] = useState<Partial<PokerTable> | null>(null);
+  const [orderedTables, setOrderedTables] = useState<PokerTable[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  );
+
+  useEffect(() => {
+    setOrderedTables(tables.data ?? []);
+  }, [tables.data]);
 
   const seatedCount = (id: string) =>
     active.data?.filter((s) => s.table.id === id).length ?? 0;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const activeId = String(event.active.id);
+    const overId = event.over ? String(event.over.id) : null;
+
+    if (!overId || activeId === overId) return;
+
+    const fromIndex = orderedTables.findIndex((table) => table.id === activeId);
+    const toIndex = orderedTables.findIndex((table) => table.id === overId);
+
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const previous = orderedTables;
+    const next = [...orderedTables];
+    const [moved] = next.splice(fromIndex, 1);
+
+    if (!moved) return;
+
+    next.splice(toIndex, 0, moved);
+    setOrderedTables(next);
+
+    reorder.mutate(
+      next.map((table) => table.id),
+      {
+        onSuccess: () => toast.success("Table order saved"),
+        onError: (error) => {
+          setOrderedTables(previous);
+          toast.error(error.message);
+        },
+      },
+    );
+  };
 
   return (
     <>
@@ -74,70 +129,142 @@ function TablesPage() {
       ) : !tables.data?.length ? (
         <Empty>No tables yet. Add your first table.</Empty>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tables.data.map((t) => {
-            const n = seatedCount(t.id);
+        <>
+          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <GripVertical className="h-4 w-4" />
+            Drag tables to set their order on the Dashboard.
+          </div>
 
-            return (
-              <div
-                key={t.id}
-                className="flex flex-col rounded-xl border bg-card p-5 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-xl font-bold">{t.name}</h3>
-                    <p className="text-muted-foreground">{t.game_type}</p>
-                  </div>
-
-                  <span
-                    className={
-                      n > 0
-                        ? "inline-flex items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-sm font-semibold text-success"
-                        : "rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground"
-                    }
-                  >
-                    {n > 0 && <span className="live-dot" />}
-                    {n} seated
-                  </span>
-                </div>
-
-                <div className="mt-5 flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setEditing(t)}
-                  >
-                    <Pencil /> Edit
-                  </Button>
-
-                  <ConfirmDialog
-                    title={`Delete ${t.name}?`}
-                    description="This permanently removes the table. Tables with play history can't be deleted."
-                    onConfirm={() =>
-                      del.mutate(t.id, {
-                        onSuccess: () => toast.success("Table deleted"),
-                        onError: (e) => toast.error(e.message),
-                      })
-                    }
-                    trigger={
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Delete table"
-                      >
-                        <Trash2 className="text-destructive" />
-                      </Button>
-                    }
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {orderedTables.map((table) => (
+                <ReorderableTableCard
+                  key={table.id}
+                  table={table}
+                  seatedCount={seatedCount(table.id)}
+                  dragDisabled={reorder.isPending}
+                  onEdit={() => setEditing(table)}
+                  onDelete={() =>
+                    del.mutate(table.id, {
+                      onSuccess: () => toast.success("Table deleted"),
+                      onError: (error) => toast.error(error.message),
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </DndContext>
+        </>
       )}
 
       <TableDialog value={editing} onClose={() => setEditing(null)} />
     </>
+  );
+}
+
+function ReorderableTableCard({
+  table,
+  seatedCount,
+  dragDisabled,
+  onEdit,
+  onDelete,
+}: {
+  table: PokerTable;
+  seatedCount: number;
+  dragDisabled: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableRef,
+    isDragging,
+  } = useDraggable({
+    id: table.id,
+    disabled: dragDisabled,
+  });
+
+  const {
+    setNodeRef: setDroppableRef,
+    isOver,
+  } = useDroppable({
+    id: table.id,
+    disabled: dragDisabled,
+  });
+
+  const setNodeRef = (node: HTMLDivElement | null) => {
+    setDraggableRef(node);
+    setDroppableRef(node);
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex flex-col rounded-xl border bg-card p-5 shadow-sm transition ${
+        isDragging ? "opacity-40" : ""
+      } ${isOver && !isDragging ? "ring-2 ring-primary/30" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <button
+            type="button"
+            className="mt-0.5 flex h-8 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={dragDisabled}
+            aria-label={`Reorder ${table.name}`}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+
+          <div className="min-w-0">
+            <h3 className="truncate text-xl font-bold">{table.name}</h3>
+            <p className="truncate text-muted-foreground">{table.game_type}</p>
+          </div>
+        </div>
+
+        <span
+          className={
+            seatedCount > 0
+              ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-success/15 px-3 py-1 text-sm font-semibold text-success"
+              : "shrink-0 rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground"
+          }
+        >
+          {seatedCount > 0 && <span className="live-dot" />}
+          {seatedCount} seated
+        </span>
+      </div>
+
+      <div className="mt-5 flex gap-2">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={onEdit}
+        >
+          <Pencil /> Edit
+        </Button>
+
+        <ConfirmDialog
+          title={`Delete ${table.name}?`}
+          description="This permanently removes the table. Tables with play history can't be deleted."
+          onConfirm={onDelete}
+          trigger={
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Delete table"
+            >
+              <Trash2 className="text-destructive" />
+            </Button>
+          }
+        />
+      </div>
+    </div>
   );
 }
 
