@@ -60,11 +60,13 @@ function excelCyprusDate(iso: string | null) {
   const local = toLocalInput(new Date(iso));
   const [datePart, timePart] = local.split("T");
 
-  const [year, month, day] = datePart
+  if (!datePart || !timePart) return "";
+
+  const [year = 0, month = 1, day = 1] = datePart
     .split("-")
     .map(Number);
 
-  const [hour, minute] = timePart
+  const [hour = 0, minute = 0] = timePart
     .split(":")
     .map(Number);
 

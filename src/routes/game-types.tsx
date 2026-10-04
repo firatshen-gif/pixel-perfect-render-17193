@@ -204,7 +204,7 @@ function GameTypeDialog({
 
               save.mutate(
                 {
-                  id: value.id,
+                  ...(value.id ? { id: value.id } : {}),
                   name: parsed.data.name,
                   is_default: isDefault,
                   was_default: value.is_default ?? false,

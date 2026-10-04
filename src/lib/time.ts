@@ -124,12 +124,12 @@ function getCyprusOffsetMs(date: Date) {
   const parts = getParts(localInputFormatter, date);
 
   const localAsUtc = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second),
+    Number(parts["year"]),
+    Number(parts["month"]) - 1,
+    Number(parts["day"]),
+    Number(parts["hour"]),
+    Number(parts["minute"]),
+    Number(parts["second"]),
   );
 
   const instantWithoutMs =
@@ -142,7 +142,7 @@ function getCyprusOffsetMs(date: Date) {
 export function toLocalInput(d: Date = new Date()) {
   const parts = getParts(localInputFormatter, d);
 
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  return `${parts["year"]}-${parts["month"]}-${parts["day"]}T${parts["hour"]}:${parts["minute"]}`;
 }
 
 export type LocalDateTimeDraft = {
@@ -183,8 +183,12 @@ export function localDateTimeToIso(draft: LocalDateTimeDraft) {
 export function fromLocalInput(v: string) {
   const [datePart, timePart] = v.split("T");
 
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
+  if (!datePart || !timePart) {
+    throw new Error(`Invalid datetime-local value: ${v}`);
+  }
+
+  const [year = 0, month = 1, day = 1] = datePart.split("-").map(Number);
+  const [hour = 0, minute = 0] = timePart.split(":").map(Number);
 
   const localAsUtc = Date.UTC(
     year,
@@ -214,7 +218,7 @@ export function cyprusDate(iso: string) {
     new Date(iso),
   );
 
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return `${parts["year"]}-${parts["month"]}-${parts["day"]}`;
 }
 
 /**
