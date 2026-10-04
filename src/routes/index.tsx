@@ -45,6 +45,7 @@ import {
   useDeleteSession,
   useLeaveTable,
   useMovePlayer,
+  useMoveSessionToWaitlist,
   usePlayers,
   useRemoveFromWaitlist,
   useSeatFromWaitlist,
@@ -126,6 +127,7 @@ function Dashboard() {
   const active = useActiveSessions();
   const waitlist = useWaitlist();
   const dragMovePlayer = useMovePlayer();
+  const dragMoveToWaitlist = useMoveSessionToWaitlist();
   const dragSeatFromWaitlist = useSeatFromWaitlist();
 
   // Update the visible session timers every second.
@@ -204,6 +206,32 @@ function Dashboard() {
     if (!event.over) return;
 
     const target = event.over.data.current;
+
+    if (target?.["kind"] === "waitlist") {
+      if (kind !== "player" || !session) return;
+
+      const movedAt = new Date().toISOString();
+
+      dragMoveToWaitlist.mutate(
+        {
+          session_id: session.id,
+          player_id: session.player.id,
+          seated_at: session.seated_at,
+          moved_at: movedAt,
+        },
+        {
+          onSuccess: () => {
+            toast.success(`${session.player.full_name} moved to waitlist`);
+          },
+          onError: (error) => {
+            toast.error(error.message);
+          },
+        },
+      );
+
+      return;
+    }
+
     if (target?.["kind"] !== "seat") return;
     if (target?.["occupied"]) return;
 
@@ -559,7 +587,7 @@ function Dashboard() {
                                 compact={dashboardView === "compact"}
                                 dimmed={!!normalizedSearch && !nameMatches}
                                 highlighted={!!normalizedSearch && nameMatches}
-                                dragDisabled={dragMovePlayer.isPending}
+                                dragDisabled={dragMovePlayer.isPending || dragMoveToWaitlist.isPending}
                                 onSitOut={() => setSittingOutSession(session)}
                                 onSitIn={() => setSittingInSession(session)}
                                 onMove={() => setMovingSession(session)}
@@ -634,7 +662,7 @@ function Dashboard() {
                               compact={dashboardView === "compact"}
                               dimmed={!!normalizedSearch && !nameMatches}
                               highlighted={!!normalizedSearch && nameMatches}
-                              dragDisabled={dragMovePlayer.isPending}
+                              dragDisabled={dragMovePlayer.isPending || dragMoveToWaitlist.isPending}
                               onSitOut={() => setSittingOutSession(session)}
                               onSitIn={() => setSittingInSession(session)}
                               onMove={() => setMovingSession(session)}
@@ -664,7 +692,10 @@ function Dashboard() {
                 tables={tables.data ?? []}
                 loading={waitlist.isLoading}
                 error={waitlist.error?.message ?? null}
-                dragDisabled={dragSeatFromWaitlist.isPending}
+                dragDisabled={
+                  dragSeatFromWaitlist.isPending || dragMoveToWaitlist.isPending
+                }
+                acceptingTablePlayer={!!draggedSession}
               />
             </aside>
           )}
@@ -739,6 +770,7 @@ function WaitlistPanel({
   loading,
   error,
   dragDisabled,
+  acceptingTablePlayer,
 }: {
   entries: WaitlistEntry[];
   activeSessions: Session[];
@@ -746,11 +778,19 @@ function WaitlistPanel({
   loading: boolean;
   error: string | null;
   dragDisabled: boolean;
+  acceptingTablePlayer: boolean;
 }) {
   const players = usePlayers();
   const addToWaitlist = useAddToWaitlist();
   const removeFromWaitlist = useRemoveFromWaitlist();
   const seatFromWaitlist = useSeatFromWaitlist();
+  const {
+    setNodeRef: setWaitlistDropRef,
+    isOver: isOverWaitlist,
+  } = useDroppable({
+    id: "waitlist-drop",
+    data: { kind: "waitlist" },
+  });
 
   const [addOpen, setAddOpen] = useState(false);
   const [playerId, setPlayerId] = useState("");
@@ -786,7 +826,14 @@ function WaitlistPanel({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div
+        ref={setWaitlistDropRef}
+        className={`overflow-hidden rounded-xl border bg-card shadow-sm transition ${
+          isOverWaitlist && acceptingTablePlayer
+            ? "ring-2 ring-primary/50"
+            : ""
+        }`}
+      >
         <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
