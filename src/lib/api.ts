@@ -651,14 +651,18 @@ export function useSeatPlayer() {
         throw new Error(`Seat #${s.seat_number} is already occupied.`);
       }
 
-      const res = await supabase.from("play_sessions").insert(s);
+      const res = await supabase
+        .from("play_sessions")
+        .insert(s)
+        .select("id")
+        .single();
 
-      if (res.error) {
-        if (res.error.code === "23505") {
+      if (res.error || !res.data) {
+        if (res.error?.code === "23505") {
           throw new Error("This player or seat is no longer available.");
         }
 
-        throw new Error(res.error.message);
+        throw new Error(res.error?.message ?? "Could not seat player.");
       }
 
       // If the player was waiting, seating them anywhere should remove the
@@ -669,8 +673,13 @@ export function useSeatPlayer() {
         .eq("player_id", s.player_id);
 
       if (waitlistCleanup.error) {
+        await supabase
+          .from("play_sessions")
+          .delete()
+          .eq("id", res.data.id);
+
         throw new Error(
-          `Player was seated, but the waitlist entry could not be removed: ${waitlistCleanup.error.message}`,
+          `Could not keep the waitlist in sync: ${waitlistCleanup.error.message}`,
         );
       }
     },
