@@ -318,7 +318,7 @@ function TableDialog({
 
               save.mutate(
                 {
-                  id: value.id,
+                  ...(value.id ? { id: value.id } : {}),
                   ...parsed.data,
                 },
                 {

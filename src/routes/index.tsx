@@ -156,7 +156,7 @@ function Dashboard() {
   const activePlayerCount = totalPlayerCount - sittingOutCount;
 
   const handleDragStart = (event: DragStartEvent) => {
-    const sessionId = event.active.data.current?.sessionId as string | undefined;
+    const sessionId = event.active.data.current?.["sessionId"] as string | undefined;
     const session = (active.data ?? []).find((item) => item.id === sessionId) ?? null;
     setDraggedSession(session);
   };
@@ -168,10 +168,10 @@ function Dashboard() {
     if (!session || !event.over) return;
 
     const target = event.over.data.current;
-    if (target?.kind !== "seat") return;
+    if (target?.["kind"] !== "seat") return;
 
-    const newTableId = String(target.tableId);
-    const newSeatNumber = Number(target.seatNumber);
+    const newTableId = String(target["tableId"]);
+    const newSeatNumber = Number(target["seatNumber"]);
 
     if (
       newTableId === session.table.id &&
