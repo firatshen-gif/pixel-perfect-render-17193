@@ -765,11 +765,11 @@ function Dashboard() {
                               <span
                                 className={`shrink-0 font-bold tabular-nums ${
                                   dashboardView === "compact"
-                                    ? "w-7 text-[11px]"
-                                    : "w-8 text-xs"
+                                    ? "w-5 text-left text-[11px]"
+                                    : "w-8 text-left text-xs"
                                 }`}
                               >
-                                #{seatNumber}
+                                {seatNumber}
                               </span>
                               <span className="flex-1" aria-hidden="true" />
                               <Plus
@@ -1453,7 +1453,7 @@ function DraggablePlayerRow({
           openSitout
             ? "text-amber-600 dark:text-amber-300"
             : "text-success"
-        } ${compact ? "w-5 text-right text-[11px]" : "w-8 text-xs"}`}
+        } ${compact ? "w-5 text-left text-[11px]" : "w-8 text-left text-xs"}`}
         title={
           openSitout
             ? `Sitting out for ${formatLiveDuration(
