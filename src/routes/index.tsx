@@ -3,6 +3,8 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Armchair,
   ArrowRightLeft,
+  ChevronLeft,
+  ChevronRight,
   EllipsisVertical,
   GripVertical,
   LogOut,
@@ -169,6 +171,9 @@ function Dashboard() {
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
   const [draggedWaitlistEntry, setDraggedWaitlistEntry] = useState<WaitlistEntry | null>(null);
   const [dashboardView, setDashboardView] = useState<"compact" | "detailed">("compact");
+  const [expandedTableStats, setExpandedTableStats] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [seatCount, setSeatCount] = useState<DashboardSeatCount>(8);
   const [playerSearch, setPlayerSearch] = useState("");
   const [waitlistOpen, setWaitlistOpen] = useState(true);
@@ -608,31 +613,74 @@ function Dashboard() {
                           </TooltipContent>
                         </Tooltip>
 
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className="flex h-7 min-w-7 items-center justify-center rounded-full bg-emerald-500/20 px-2 text-xs font-bold text-emerald-700 dark:text-emerald-300"
-                              tabIndex={0}
-                            >
-                              {sittingInCount}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Players sitting in
-                          </TooltipContent>
-                        </Tooltip>
+                        {expandedTableStats.has(table.id) && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="flex h-7 min-w-7 items-center justify-center rounded-full bg-emerald-500/20 px-2 text-xs font-bold text-emerald-700 dark:text-emerald-300"
+                                  tabIndex={0}
+                                >
+                                  {sittingInCount}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Players sitting in
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-400/25 px-2 text-xs font-bold text-amber-700 dark:text-amber-300"
+                                  tabIndex={0}
+                                >
+                                  {sittingOutCount}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Players sitting out
+                              </TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
 
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span
-                              className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-400/25 px-2 text-xs font-bold text-amber-700 dark:text-amber-300"
-                              tabIndex={0}
+                            <button
+                              type="button"
+                              className="flex h-7 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted/70 hover:text-foreground"
+                              aria-label={
+                                expandedTableStats.has(table.id)
+                                  ? `Hide player status counts for ${table.name}`
+                                  : `Show player status counts for ${table.name}`
+                              }
+                              aria-expanded={expandedTableStats.has(table.id)}
+                              onClick={() =>
+                                setExpandedTableStats((current) => {
+                                  const next = new Set(current);
+
+                                  if (next.has(table.id)) {
+                                    next.delete(table.id);
+                                  } else {
+                                    next.add(table.id);
+                                  }
+
+                                  return next;
+                                })
+                              }
                             >
-                              {sittingOutCount}
-                            </span>
+                              {expandedTableStats.has(table.id) ? (
+                                <ChevronLeft className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            Players sitting out
+                            {expandedTableStats.has(table.id)
+                              ? "Hide status counts"
+                              : "Show status counts"}
                           </TooltipContent>
                         </Tooltip>
                       </div>
