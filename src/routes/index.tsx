@@ -104,6 +104,9 @@ import {
 } from "@/components/ui/select";
 
 type DashboardSeatCount = 8 | 10 | 12;
+type DashboardView = "compact" | "detailed";
+
+const DASHBOARD_VIEW_STORAGE_KEY = "tournament-floor-dashboard-view";
 
 const GAME_TYPE_STYLES = [
   {
@@ -170,7 +173,7 @@ function Dashboard() {
   const [sittingInSession, setSittingInSession] = useState<Session | null>(null);
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
   const [draggedWaitlistEntry, setDraggedWaitlistEntry] = useState<WaitlistEntry | null>(null);
-  const [dashboardView, setDashboardView] = useState<"compact" | "detailed">("compact");
+  const [dashboardView, setDashboardView] = useState<DashboardView>("compact");
   const [expandedTableStats, setExpandedTableStats] = useState<Set<string>>(
     () => new Set(),
   );
@@ -192,10 +195,32 @@ function Dashboard() {
   ) as DashboardSeatCount;
 
   useEffect(() => {
+    try {
+      const savedView = localStorage.getItem(DASHBOARD_VIEW_STORAGE_KEY);
+
+      if (savedView === "compact" || savedView === "detailed") {
+        setDashboardView(savedView);
+      }
+    } catch {
+      // Keep the default compact view if local storage is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
     if (seatCount < minimumSeatCount) {
       setSeatCount(minimumSeatCount);
     }
   }, [minimumSeatCount, seatCount]);
+
+  const changeDashboardView = (view: DashboardView) => {
+    setDashboardView(view);
+
+    try {
+      localStorage.setItem(DASHBOARD_VIEW_STORAGE_KEY, view);
+    } catch {
+      // The selection still works for this session if storage is unavailable.
+    }
+  };
 
   const activeTableCount = new Set(
     (active.data ?? []).map((session) => session.table.id),
@@ -453,7 +478,7 @@ function Dashboard() {
               size="sm"
               variant={dashboardView === "compact" ? "default" : "ghost"}
               className="h-8"
-              onClick={() => setDashboardView("compact")}
+              onClick={() => changeDashboardView("compact")}
             >
               Compact
             </Button>
@@ -462,7 +487,7 @@ function Dashboard() {
               size="sm"
               variant={dashboardView === "detailed" ? "default" : "ghost"}
               className="h-8"
-              onClick={() => setDashboardView("detailed")}
+              onClick={() => changeDashboardView("detailed")}
             >
               Detailed
             </Button>
