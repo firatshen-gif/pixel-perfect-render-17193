@@ -145,6 +145,40 @@ export function toLocalInput(d: Date = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
+export type LocalDateTimeDraft = {
+  value: string;
+  exactIso: string | null;
+};
+
+/**
+ * Default "now" value for a minute-based datetime-local input.
+ * The visible input stays minute-based, while exactIso keeps the real seconds.
+ */
+export function localDateTimeNow(): LocalDateTimeDraft {
+  const now = new Date();
+
+  return {
+    value: toLocalInput(now),
+    exactIso: now.toISOString(),
+  };
+}
+
+/** Mark a datetime-local value as manually edited, so minute precision is intentional. */
+export function localDateTimeEdited(value: string): LocalDateTimeDraft {
+  return {
+    value,
+    exactIso: null,
+  };
+}
+
+/**
+ * Resolve a datetime-local draft to UTC.
+ * Untouched "now" defaults preserve real seconds; manually edited values remain minute-based.
+ */
+export function localDateTimeToIso(draft: LocalDateTimeDraft) {
+  return draft.exactIso ?? fromLocalInput(draft.value);
+}
+
 /** Parse datetime-local as Cyprus local time -> UTC ISO string. */
 export function fromLocalInput(v: string) {
   const [datePart, timePart] = v.split("T");
