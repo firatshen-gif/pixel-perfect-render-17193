@@ -516,6 +516,115 @@ export function useRemoveFromWaitlist() {
   });
 }
 
+export function useMoveSessionToWaitlist() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (s: {
+      session_id: string;
+      player_id: string;
+      seated_at: string;
+      moved_at: string;
+    }) => {
+      if (new Date(s.moved_at) < new Date(s.seated_at)) {
+        throw new Error("Waitlist time can't be earlier than seated time.");
+      }
+
+      const existingWaitlist = check(
+        await supabase
+          .from("waitlist")
+          .select("id")
+          .eq("player_id", s.player_id)
+          .maybeSingle(),
+      ) as { id: string } | null;
+
+      if (existingWaitlist) {
+        throw new Error("This player is already on the waitlist.");
+      }
+
+      const openSitout = check(
+        await supabase
+          .from("session_sitouts")
+          .select("id, sat_out_at")
+          .eq("play_session_id", s.session_id)
+          .is("sat_in_at", null)
+          .maybeSingle(),
+      ) as { id: string; sat_out_at: string } | null;
+
+      if (openSitout && new Date(s.moved_at) < new Date(openSitout.sat_out_at)) {
+        throw new Error("Waitlist time can't be earlier than the current sit-out time.");
+      }
+
+      if (openSitout) {
+        check(
+          await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: s.moved_at })
+            .eq("id", openSitout.id),
+        );
+      }
+
+      const closedSession = check(
+        await supabase
+          .from("play_sessions")
+          .update({ left_at: s.moved_at })
+          .eq("id", s.session_id)
+          .eq("player_id", s.player_id)
+          .is("left_at", null)
+          .select("id")
+          .maybeSingle(),
+      ) as { id: string } | null;
+
+      if (!closedSession) {
+        if (openSitout) {
+          await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: null })
+            .eq("id", openSitout.id);
+        }
+
+        throw new Error("This play session is no longer active.");
+      }
+
+      const waitlistInsert = await supabase.from("waitlist").insert({
+        player_id: s.player_id,
+        added_at: s.moved_at,
+      });
+
+      if (waitlistInsert.error) {
+        const restoreSession = await supabase
+          .from("play_sessions")
+          .update({ left_at: null })
+          .eq("id", s.session_id);
+
+        let restoreSitoutError: string | null = null;
+
+        if (openSitout) {
+          const restoreSitout = await supabase
+            .from("session_sitouts")
+            .update({ sat_in_at: null })
+            .eq("id", openSitout.id);
+
+          restoreSitoutError = restoreSitout.error?.message ?? null;
+        }
+
+        if (restoreSession.error || restoreSitoutError) {
+          throw new Error(
+            `Could not add player to waitlist and the original session could not be fully restored: ${waitlistInsert.error.message}`,
+          );
+        }
+
+        if (waitlistInsert.error.code === "23505") {
+          throw new Error("This player is already on the waitlist.");
+        }
+
+        throw new Error(waitlistInsert.error.message);
+      }
+    },
+    onSuccess: inv,
+  });
+}
+
 export function useSeatFromWaitlist() {
   const inv = useInvalidate();
 
