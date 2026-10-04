@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRightLeft,
-  Clock3,
   EllipsisVertical,
   GripVertical,
   LogOut,
@@ -59,7 +58,6 @@ import {
 } from "@/lib/api";
 
 import {
-  formatDuration,
   formatLiveDuration,
   localDateTimeEdited,
   localDateTimeNow,
@@ -127,6 +125,7 @@ function Dashboard() {
   const active = useActiveSessions();
   const waitlist = useWaitlist();
   const dragMovePlayer = useMovePlayer();
+  const dragSeatFromWaitlist = useSeatFromWaitlist();
 
   // Update the visible session timers every second.
   const now = useNow(1000);
@@ -145,6 +144,7 @@ function Dashboard() {
   const [sittingOutSession, setSittingOutSession] = useState<Session | null>(null);
   const [sittingInSession, setSittingInSession] = useState<Session | null>(null);
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
+  const [draggedWaitlistEntry, setDraggedWaitlistEntry] = useState<WaitlistEntry | null>(null);
   const [dashboardView, setDashboardView] = useState<"compact" | "detailed">("compact");
   const [playerSearch, setPlayerSearch] = useState("");
   const [waitlistOpen, setWaitlistOpen] = useState(true);
@@ -168,16 +168,39 @@ function Dashboard() {
   const activePlayerCount = totalPlayerCount - sittingOutCount;
 
   const handleDragStart = (event: DragStartEvent) => {
-    const sessionId = event.active.data.current?.["sessionId"] as string | undefined;
-    const session = (active.data ?? []).find((item) => item.id === sessionId) ?? null;
+    const kind = event.active.data.current?.["kind"];
+
+    if (kind === "waitlist-player") {
+      const waitlistId = event.active.data.current?.["waitlistId"] as
+        | string
+        | undefined;
+      const entry =
+        (waitlist.data ?? []).find((item) => item.id === waitlistId) ?? null;
+
+      setDraggedSession(null);
+      setDraggedWaitlistEntry(entry);
+      return;
+    }
+
+    const sessionId = event.active.data.current?.["sessionId"] as
+      | string
+      | undefined;
+    const session =
+      (active.data ?? []).find((item) => item.id === sessionId) ?? null;
+
+    setDraggedWaitlistEntry(null);
     setDraggedSession(session);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    const kind = event.active.data.current?.["kind"];
     const session = draggedSession;
-    setDraggedSession(null);
+    const waitlistEntry = draggedWaitlistEntry;
 
-    if (!session || !event.over) return;
+    setDraggedSession(null);
+    setDraggedWaitlistEntry(null);
+
+    if (!event.over) return;
 
     const target = event.over.data.current;
     if (target?.["kind"] !== "seat") return;
@@ -185,6 +208,39 @@ function Dashboard() {
 
     const newTableId = String(target["tableId"]);
     const newSeatNumber = Number(target["seatNumber"]);
+    const destinationTable = tables.data?.find(
+      (table) => table.id === newTableId,
+    );
+
+    if (kind === "waitlist-player") {
+      if (!waitlistEntry) return;
+
+      dragSeatFromWaitlist.mutate(
+        {
+          waitlist_id: waitlistEntry.id,
+          player_id: waitlistEntry.player_id,
+          table_id: newTableId,
+          seat_number: newSeatNumber,
+          seated_at: new Date().toISOString(),
+        },
+        {
+          onSuccess: () => {
+            toast.success(
+              `${waitlistEntry.player.full_name} seated at ${
+                destinationTable?.name ?? "table"
+              } · Seat #${newSeatNumber}`,
+            );
+          },
+          onError: (error) => {
+            toast.error(error.message);
+          },
+        },
+      );
+
+      return;
+    }
+
+    if (!session) return;
 
     if (
       newTableId === session.table.id &&
@@ -193,9 +249,6 @@ function Dashboard() {
       return;
     }
 
-    const destinationTable = tables.data?.find(
-      (table) => table.id === newTableId,
-    );
     const isSittingOut = session.sitouts.some(
       (sitout) => !sitout.sat_in_at,
     );
@@ -345,18 +398,21 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="flex flex-col items-start gap-4 xl:flex-row">
-        <div className="w-full min-w-0 flex-1">
-          {!tables.data?.length ? (
-            <Empty>No tables have been created yet.</Empty>
-          ) : (
-            <DndContext
-          sensors={dragSensors}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragCancel={() => setDraggedSession(null)}
-        >
-          <div
+      <DndContext
+        sensors={dragSensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          setDraggedSession(null);
+          setDraggedWaitlistEntry(null);
+        }}
+      >
+        <div className="flex flex-col items-start gap-4 xl:flex-row">
+          <div className="w-full min-w-0 flex-1">
+            {!tables.data?.length ? (
+              <Empty>No tables have been created yet.</Empty>
+            ) : (
+              <div
             className={
               dashboardView === "compact"
                 ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
@@ -596,41 +652,52 @@ function Dashboard() {
           })}
           </div>
 
-          <DragOverlay>
-            {draggedSession ? (
-              <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-lg">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-bold text-muted-foreground">
-                  {draggedSession.seat_number
-                    ? `#${draggedSession.seat_number}`
-                    : "—"}
-                </span>
-                <span className="text-sm font-semibold">
-                  {draggedSession.player.full_name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {draggedSession.table.name}
-                </span>
-              </div>
-            ) : null}
-          </DragOverlay>
-            </DndContext>
+            )}
+          </div>
+
+          {waitlistOpen && (
+            <aside className="order-first w-full shrink-0 xl:order-last xl:sticky xl:top-20 xl:w-72">
+              <WaitlistPanel
+                entries={waitlist.data ?? []}
+                activeSessions={active.data ?? []}
+                tables={tables.data ?? []}
+                loading={waitlist.isLoading}
+                error={waitlist.error?.message ?? null}
+                dragDisabled={dragSeatFromWaitlist.isPending}
+              />
+            </aside>
           )}
         </div>
 
-        {waitlistOpen && (
-          <aside className="order-first w-full shrink-0 xl:order-last xl:sticky xl:top-20 xl:w-72">
-            <WaitlistPanel
-              entries={waitlist.data ?? []}
-              activeSessions={active.data ?? []}
-              tables={tables.data ?? []}
-              now={now}
-              loading={waitlist.isLoading}
-              error={waitlist.error?.message ?? null}
-            />
-          </aside>
-        )}
-      </div>
+        <DragOverlay>
+          {draggedSession ? (
+            <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-lg">
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-bold text-muted-foreground">
+                {draggedSession.seat_number
+                  ? `#${draggedSession.seat_number}`
+                  : "—"}
+              </span>
+              <span className="text-sm font-semibold">
+                {draggedSession.player.full_name}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {draggedSession.table.name}
+              </span>
+            </div>
+          ) : draggedWaitlistEntry ? (
+            <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-lg">
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">
+                {draggedWaitlistEntry.player.full_name}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Waitlist
+              </span>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <SeatAtTableDialog
         table={seatingTable}
@@ -668,16 +735,16 @@ function WaitlistPanel({
   entries,
   activeSessions,
   tables,
-  now,
   loading,
   error,
+  dragDisabled,
 }: {
   entries: WaitlistEntry[];
   activeSessions: Session[];
   tables: PokerTable[];
-  now: number;
   loading: boolean;
   error: string | null;
+  dragDisabled: boolean;
 }) {
   const players = usePlayers();
   const addToWaitlist = useAddToWaitlist();
@@ -768,57 +835,27 @@ function WaitlistPanel({
           ) : (
             <div className="divide-y">
               {entries.map((entry, index) => (
-                <div key={entry.id} className="px-3 py-2.5">
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold tabular-nums text-muted-foreground">
-                      {index + 1}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {entry.player.full_name}
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Clock3 className="h-3 w-3" />
-                        Waiting {formatDuration(now - new Date(entry.added_at).getTime())}
-                      </div>
-                    </div>
-
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => {
-                        setTableId("");
-                        setSeatNumber("");
-                        setSeatingEntry(entry);
-                      }}
-                    >
-                      Seat
-                    </Button>
-
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                      disabled={removeFromWaitlist.isPending}
-                      onClick={() => {
-                        removeFromWaitlist.mutate(entry.id, {
-                          onSuccess: () =>
-                            toast.success(
-                              `${entry.player.full_name} removed from waitlist`,
-                            ),
-                          onError: (error) => toast.error(error.message),
-                        });
-                      }}
-                      aria-label={`Remove ${entry.player.full_name} from waitlist`}
-                      title="Remove from waitlist"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
+                <WaitlistPlayerRow
+                  key={entry.id}
+                  entry={entry}
+                  position={index + 1}
+                  dragDisabled={dragDisabled}
+                  removeDisabled={removeFromWaitlist.isPending}
+                  onSeat={() => {
+                    setTableId("");
+                    setSeatNumber("");
+                    setSeatingEntry(entry);
+                  }}
+                  onRemove={() => {
+                    removeFromWaitlist.mutate(entry.id, {
+                      onSuccess: () =>
+                        toast.success(
+                          `${entry.player.full_name} removed from waitlist`,
+                        ),
+                      onError: (error) => toast.error(error.message),
+                    });
+                  }}
+                />
               ))}
             </div>
           )}
@@ -1016,6 +1053,106 @@ function WaitlistPanel({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function WaitlistPlayerRow({
+  entry,
+  position,
+  dragDisabled,
+  removeDisabled,
+  onSeat,
+  onRemove,
+}: {
+  entry: WaitlistEntry;
+  position: number;
+  dragDisabled: boolean;
+  removeDisabled: boolean;
+  onSeat: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    isDragging,
+  } = useDraggable({
+    id: `waitlist:${entry.id}`,
+    data: {
+      kind: "waitlist-player",
+      waitlistId: entry.id,
+    },
+    disabled: dragDisabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex min-h-8 items-center gap-1.5 px-2 py-1 transition-opacity ${
+        isDragging ? "opacity-35" : ""
+      }`}
+    >
+      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold tabular-nums text-muted-foreground">
+        {position}
+      </span>
+
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="flex h-6 w-5 shrink-0 touch-none cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={dragDisabled}
+              aria-label={`Drag ${entry.player.full_name} to an empty seat`}
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            Drag to an empty seat
+          </TooltipContent>
+        </Tooltip>
+
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {entry.player.full_name}
+        </span>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-7 w-7"
+              onClick={onSeat}
+              aria-label={`Seat ${entry.player.full_name}`}
+            >
+              <Play className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Seat Player</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+              disabled={removeDisabled}
+              onClick={onRemove}
+              aria-label={`Remove ${entry.player.full_name} from waitlist`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Remove from waitlist</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
   );
 }
 
