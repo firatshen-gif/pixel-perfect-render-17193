@@ -129,7 +129,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthGate>
         <AppNav />
-        <main className="mx-auto max-w-7xl px-4 py-6 md:py-8">
+        <main className="mx-auto max-w-[100rem] px-4 py-6 md:py-8">
           <Outlet />
         </main>
       </AuthGate>
