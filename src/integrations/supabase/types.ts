@@ -137,6 +137,7 @@ export type Database = {
           game_type_id: string | null
           id: string
           name: string
+          sort_order: number
         }
         Insert: {
           created_at?: string
@@ -144,6 +145,7 @@ export type Database = {
           game_type_id?: string | null
           id?: string
           name: string
+          sort_order: number
         }
         Update: {
           created_at?: string
@@ -151,6 +153,7 @@ export type Database = {
           game_type_id?: string | null
           id?: string
           name?: string
+          sort_order?: number
         }
         Relationships: [
           {
