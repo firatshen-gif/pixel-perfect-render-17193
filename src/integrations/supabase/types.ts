@@ -41,8 +41,8 @@ export type Database = {
           id: string
           left_at: string | null
           player_id: string
-          seated_at: string
           seat_number: number | null
+          seated_at: string
           table_id: string
         }
         Insert: {
@@ -50,8 +50,8 @@ export type Database = {
           id?: string
           left_at?: string | null
           player_id: string
-          seated_at: string
           seat_number?: number | null
+          seated_at: string
           table_id: string
         }
         Update: {
@@ -59,8 +59,8 @@ export type Database = {
           id?: string
           left_at?: string | null
           player_id?: string
-          seated_at?: string
           seat_number?: number | null
+          seated_at?: string
           table_id?: string
         }
         Relationships: [
@@ -76,38 +76,6 @@ export type Database = {
             columns: ["table_id"]
             isOneToOne: false
             referencedRelation: "poker_tables"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      session_sitouts: {
-        Row: {
-          created_at: string
-          id: string
-          play_session_id: string
-          sat_in_at: string | null
-          sat_out_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          play_session_id: string
-          sat_in_at?: string | null
-          sat_out_at: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          play_session_id?: string
-          sat_in_at?: string | null
-          sat_out_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "session_sitouts_play_session_id_fkey"
-            columns: ["play_session_id"]
-            isOneToOne: false
-            referencedRelation: "play_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -161,6 +129,38 @@ export type Database = {
             columns: ["game_type_id"]
             isOneToOne: false
             referencedRelation: "game_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_sitouts: {
+        Row: {
+          created_at: string
+          id: string
+          play_session_id: string
+          sat_in_at: string | null
+          sat_out_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          play_session_id: string
+          sat_in_at?: string | null
+          sat_out_at: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          play_session_id?: string
+          sat_in_at?: string | null
+          sat_out_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_sitouts_play_session_id_fkey"
+            columns: ["play_session_id"]
+            isOneToOne: false
+            referencedRelation: "play_sessions"
             referencedColumns: ["id"]
           },
         ]
