@@ -564,23 +564,25 @@ export function useMoveSessionToWaitlist() {
         );
       }
 
-      const closedSession = check(
-        await supabase
-          .from("play_sessions")
-          .update({ left_at: s.moved_at })
-          .eq("id", s.session_id)
-          .eq("player_id", s.player_id)
-          .is("left_at", null)
-          .select("id")
-          .maybeSingle(),
-      ) as { id: string } | null;
+      const closedSessionResult = await supabase
+        .from("play_sessions")
+        .update({ left_at: s.moved_at })
+        .eq("id", s.session_id)
+        .eq("player_id", s.player_id)
+        .is("left_at", null)
+        .select("id")
+        .maybeSingle();
 
-      if (!closedSession) {
+      if (closedSessionResult.error || !closedSessionResult.data) {
         if (openSitout) {
           await supabase
             .from("session_sitouts")
             .update({ sat_in_at: null })
             .eq("id", openSitout.id);
+        }
+
+        if (closedSessionResult.error) {
+          throw new Error(closedSessionResult.error.message);
         }
 
         throw new Error("This play session is no longer active.");
