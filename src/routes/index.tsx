@@ -1459,7 +1459,7 @@ function DraggablePlayerRow({
             : "Sitting in"
         }
       >
-        {seatNumber ? `#${seatNumber}` : "—"}
+        {seatNumber ?? "—"}
       </span>
 
       <TooltipProvider delayDuration={200}>
