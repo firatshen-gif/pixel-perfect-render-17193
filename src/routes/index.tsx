@@ -107,19 +107,19 @@ type DashboardSeatCount = 8 | 10 | 12;
 
 const GAME_TYPE_STYLES = [
   {
-    header: "bg-sky-50/80 dark:bg-sky-500/10",
+    header: "bg-rose-50/80 dark:bg-rose-500/10",
   },
   {
-    header: "bg-amber-50/80 dark:bg-amber-500/10",
+    header: "bg-sky-50/80 dark:bg-sky-500/10",
   },
   {
     header: "bg-violet-50/80 dark:bg-violet-500/10",
   },
   {
-    header: "bg-rose-50/80 dark:bg-rose-500/10",
+    header: "bg-fuchsia-50/80 dark:bg-fuchsia-500/10",
   },
   {
-    header: "bg-teal-50/80 dark:bg-teal-500/10",
+    header: "bg-indigo-50/80 dark:bg-indigo-500/10",
   },
 ] as const;
 
