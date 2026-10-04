@@ -1,5 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutDashboard, Grid3x3, Users, Armchair, BarChart3, Spade, Tags } from "lucide-react";
+import { useState } from "react";
+import {
+  Armchair,
+  BarChart3,
+  Grid3x3,
+  LayoutDashboard,
+  LogOut,
+  Spade,
+  Tags,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -11,6 +23,18 @@ const items = [
 ] as const;
 
 export function AppNav() {
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signOut = async () => {
+    setSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    setSigningOut(false);
+
+    if (error) {
+      toast.error(error.message);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-felt text-felt-foreground shadow-md">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-2">
@@ -33,6 +57,16 @@ export function AppNav() {
             </Link>
           ))}
         </nav>
+        <button
+          type="button"
+          onClick={signOut}
+          disabled={signingOut}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md opacity-80 transition hover:bg-sidebar-accent hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
     </header>
   );
