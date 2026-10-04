@@ -19,6 +19,13 @@ export type PokerTable = {
 
 export type Player = { id: string; full_name: string; created_at: string };
 
+export type WaitlistEntry = {
+  id: string;
+  player_id: string;
+  added_at: string;
+  player: { id: string; full_name: string };
+};
+
 export type SessionSitout = {
   id: string;
   sat_out_at: string;
@@ -133,6 +140,20 @@ export function usePlayers() {
     queryKey: ["players"],
     queryFn: async () =>
       check(await supabase.from("players").select("*").order("full_name")) as Player[],
+  });
+}
+
+export function useWaitlist() {
+  return useQuery({
+    queryKey: ["waitlist"],
+    queryFn: async () =>
+      check(
+        await supabase
+          .from("waitlist")
+          .select("id, player_id, added_at, player:players!inner(id, full_name)")
+          .order("added_at", { ascending: true }),
+      ) as unknown as WaitlistEntry[],
+    refetchInterval: 30000,
   });
 }
 
@@ -442,6 +463,145 @@ export function useDeletePlayer() {
           `This player has ${count} play session${count === 1 ? "" : "s"} on record and can't be deleted, to keep the history intact.`,
         );
       check(await supabase.from("players").delete().eq("id", id));
+    },
+    onSuccess: inv,
+  });
+}
+
+// ---------- Waitlist ----------
+export function useAddToWaitlist() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (playerId: string) => {
+      const activeSession = check(
+        await supabase
+          .from("play_sessions")
+          .select("id, table:poker_tables(name)")
+          .eq("player_id", playerId)
+          .is("left_at", null)
+          .maybeSingle(),
+      ) as { id: string; table: { name: string } | null } | null;
+
+      if (activeSession) {
+        throw new Error(
+          `This player is already seated at ${activeSession.table?.name ?? "a table"}.`,
+        );
+      }
+
+      const result = await supabase.from("waitlist").insert({
+        player_id: playerId,
+      });
+
+      if (result.error) {
+        if (result.error.code === "23505") {
+          throw new Error("This player is already on the waitlist.");
+        }
+
+        throw new Error(result.error.message);
+      }
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useRemoveFromWaitlist() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      check(await supabase.from("waitlist").delete().eq("id", id));
+    },
+    onSuccess: inv,
+  });
+}
+
+export function useSeatFromWaitlist() {
+  const inv = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (s: {
+      waitlist_id: string;
+      player_id: string;
+      table_id: string;
+      seat_number: number;
+      seated_at: string;
+    }) => {
+      if (s.seat_number < 1 || s.seat_number > 12) {
+        throw new Error("Seat number must be between 1 and 12.");
+      }
+
+      const activeSession = check(
+        await supabase
+          .from("play_sessions")
+          .select("id, table:poker_tables(name)")
+          .eq("player_id", s.player_id)
+          .is("left_at", null)
+          .maybeSingle(),
+      ) as { id: string; table: { name: string } | null } | null;
+
+      if (activeSession) {
+        throw new Error(
+          `This player is already seated at ${activeSession.table?.name ?? "a table"}.`,
+        );
+      }
+
+      const occupiedSeat = check(
+        await supabase
+          .from("play_sessions")
+          .select("id")
+          .eq("table_id", s.table_id)
+          .eq("seat_number", s.seat_number)
+          .is("left_at", null)
+          .maybeSingle(),
+      ) as { id: string } | null;
+
+      if (occupiedSeat) {
+        throw new Error(`Seat #${s.seat_number} is already occupied.`);
+      }
+
+      // Claim the waitlist row first. If another operator already seated or removed
+      // this player, the row will be gone and no new session is created.
+      const claimed = check(
+        await supabase
+          .from("waitlist")
+          .delete()
+          .eq("id", s.waitlist_id)
+          .eq("player_id", s.player_id)
+          .select("id, player_id, added_at")
+          .maybeSingle(),
+      ) as { id: string; player_id: string; added_at: string } | null;
+
+      if (!claimed) {
+        throw new Error("This player is no longer on the waitlist.");
+      }
+
+      const insertResult = await supabase.from("play_sessions").insert({
+        player_id: s.player_id,
+        table_id: s.table_id,
+        seat_number: s.seat_number,
+        seated_at: s.seated_at,
+      });
+
+      if (insertResult.error) {
+        const restore = await supabase.from("waitlist").insert({
+          id: claimed.id,
+          player_id: claimed.player_id,
+          added_at: claimed.added_at,
+        });
+
+        if (restore.error) {
+          throw new Error(
+            `Seating failed and the waitlist entry could not be restored: ${insertResult.error.message}`,
+          );
+        }
+
+        if (insertResult.error.code === "23505") {
+          throw new Error("This player or seat is no longer available.");
+        }
+
+        throw new Error(insertResult.error.message);
+      }
     },
     onSuccess: inv,
   });
