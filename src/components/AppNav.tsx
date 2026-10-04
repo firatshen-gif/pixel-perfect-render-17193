@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Armchair,
   BarChart3,
   Grid3x3,
   LayoutDashboard,
   LogOut,
+  Moon,
   Spade,
+  Sun,
   Tags,
   Users,
 } from "lucide-react";
@@ -24,6 +26,22 @@ const items = [
 
 export function AppNav() {
   const [signingOut, setSigningOut] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    setDarkMode(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleDarkMode = () => {
+    const nextDarkMode = !darkMode;
+
+    document.documentElement.classList.toggle("dark", nextDarkMode);
+    localStorage.setItem(
+      "tournament-floor-theme",
+      nextDarkMode ? "dark" : "light",
+    );
+    setDarkMode(nextDarkMode);
+  };
 
   const signOut = async () => {
     setSigningOut(true);
@@ -57,6 +75,28 @@ export function AppNav() {
             </Link>
           ))}
         </nav>
+        <button
+          type="button"
+          onClick={toggleDarkMode}
+          className="relative flex h-7 w-12 shrink-0 items-center rounded-full border border-white/15 bg-black/15 p-0.5 transition hover:bg-black/25"
+          role="switch"
+          aria-checked={darkMode}
+          aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          title={darkMode ? "Light mode" : "Dark mode"}
+        >
+          <span
+            className={`flex h-5 w-5 items-center justify-center rounded-full bg-felt-foreground text-felt shadow-sm transition-transform ${
+              darkMode ? "translate-x-5" : "translate-x-0"
+            }`}
+          >
+            {darkMode ? (
+              <Moon className="h-3 w-3" />
+            ) : (
+              <Sun className="h-3 w-3" />
+            )}
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={signOut}
