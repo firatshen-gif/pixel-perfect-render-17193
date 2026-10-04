@@ -74,10 +74,18 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/game-types' | '/players' | '/reports' | '/sessions' | '/tables'
+  fullPaths:
+    '/' | '/game-types' | '/players' | '/reports' | '/sessions' | '/tables'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/game-types' | '/players' | '/reports' | '/sessions' | '/tables'
-  id: '__root__' | '/' | '/game-types' | '/players' | '/reports' | '/sessions' | '/tables'
+  id:
+    | '__root__'
+    | '/'
+    | '/game-types'
+    | '/players'
+    | '/reports'
+    | '/sessions'
+    | '/tables'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
