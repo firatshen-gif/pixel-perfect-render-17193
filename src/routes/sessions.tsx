@@ -3,7 +3,15 @@ import { useMemo, useState, type FormEvent } from "react";
 import { LogOut, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useActiveSessions, useLeaveTable, usePlayers, useSeatPlayer, useTables, type Session } from "@/lib/api";
-import { formatDateTime, formatDuration, fromLocalInput, sessionMs, toLocalInput, useNow } from "@/lib/time";
+import {
+  formatDateTime,
+  formatDuration,
+  localDateTimeEdited,
+  localDateTimeNow,
+  localDateTimeToIso,
+  sessionMs,
+  useNow,
+} from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -104,7 +112,7 @@ function SeatForm() {
   const [playerId, setPlayerId] = useState("");
   const [tableId, setTableId] = useState("");
   const [seatNumber, setSeatNumber] = useState("");
-  const [seatedAt, setSeatedAt] = useState(() => toLocalInput());
+  const [seatedAt, setSeatedAt] = useState(() => localDateTimeNow());
 
   const seatedMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -131,7 +139,7 @@ function SeatForm() {
     if (!playerId) { toast.error("Choose a player"); return; }
     if (!tableId) { toast.error("Choose a table"); return; }
     if (!seatNumber) { toast.error("Choose a seat"); return; }
-    if (!seatedAt) { toast.error("Choose a seated time"); return; }
+    if (!seatedAt.value) { toast.error("Choose a seated time"); return; }
     const name = players.data?.find((p) => p.id === playerId)?.full_name;
     const table = tables.data?.find((t) => t.id === tableId)?.name;
     seat.mutate(
@@ -139,14 +147,14 @@ function SeatForm() {
         player_id: playerId,
         table_id: tableId,
         seat_number: Number(seatNumber),
-        seated_at: fromLocalInput(seatedAt),
+        seated_at: localDateTimeToIso(seatedAt),
       },
       {
         onSuccess: () => {
           toast.success(`${name} seated at ${table} · Seat #${seatNumber}`);
           setPlayerId("");
           setSeatNumber("");
-          setSeatedAt(toLocalInput());
+          setSeatedAt(localDateTimeNow());
         },
         onError: (err) => toast.error(err.message),
       },
@@ -214,8 +222,8 @@ function SeatForm() {
           <Input
             id="seated_at"
             type="datetime-local"
-            value={seatedAt}
-            onChange={(e) => setSeatedAt(e.target.value)}
+            value={seatedAt.value}
+            onChange={(e) => setSeatedAt(localDateTimeEdited(e.target.value))}
             className="h-12 bg-card text-base text-card-foreground"
           />
         </div>
@@ -229,7 +237,7 @@ function SeatForm() {
 
 function LeaveDialog({ session, onClose }: { session: Session | null; onClose: () => void }) {
   const leave = useLeaveTable();
-  const [leftAt, setLeftAt] = useState("");
+  const [leftAt, setLeftAt] = useState(() => localDateTimeNow());
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -241,7 +249,7 @@ function LeaveDialog({ session, onClose }: { session: Session | null; onClose: (
     >
       <DialogContent
         onOpenAutoFocus={() => {
-          setLeftAt(toLocalInput());
+          setLeftAt(localDateTimeNow());
           setError(null);
         }}
       >
@@ -250,8 +258,8 @@ function LeaveDialog({ session, onClose }: { session: Session | null; onClose: (
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!leftAt) return setError("Choose a time");
-              const iso = fromLocalInput(leftAt);
+              if (!leftAt.value) return setError("Choose a time");
+              const iso = localDateTimeToIso(leftAt);
               if (new Date(iso) < new Date(session.seated_at))
                 return setError("Left time can't be earlier than seated time.");
               leave.mutate(
@@ -283,7 +291,13 @@ function LeaveDialog({ session, onClose }: { session: Session | null; onClose: (
             </dl>
             <div className="space-y-2">
               <Label htmlFor="left_at">Left at</Label>
-              <Input id="left_at" type="datetime-local" value={leftAt} onChange={(e) => setLeftAt(e.target.value)} className="h-12 text-base" />
+              <Input
+                id="left_at"
+                type="datetime-local"
+                value={leftAt.value}
+                onChange={(e) => setLeftAt(localDateTimeEdited(e.target.value))}
+                className="h-12 text-base"
+              />
             </div>
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
             <DialogFooter>
