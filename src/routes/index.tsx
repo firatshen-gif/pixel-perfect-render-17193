@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Armchair,
   ArrowRightLeft,
@@ -101,6 +101,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type DashboardSeatCount = 8 | 10 | 12;
+
 const GAME_TYPE_STYLES = [
   {
     header: "bg-sky-50/80 dark:bg-sky-500/10",
@@ -167,10 +169,28 @@ function Dashboard() {
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
   const [draggedWaitlistEntry, setDraggedWaitlistEntry] = useState<WaitlistEntry | null>(null);
   const [dashboardView, setDashboardView] = useState<"compact" | "detailed">("compact");
+  const [seatCount, setSeatCount] = useState<DashboardSeatCount>(8);
   const [playerSearch, setPlayerSearch] = useState("");
   const [waitlistOpen, setWaitlistOpen] = useState(true);
 
   const normalizedSearch = playerSearch.trim().toLowerCase();
+
+  const maxOccupiedSeat = Math.max(
+    0,
+    ...(active.data ?? []).map((session) => session.seat_number ?? 0),
+  );
+  const minimumSeatCount: DashboardSeatCount =
+    maxOccupiedSeat <= 8 ? 8 : maxOccupiedSeat <= 10 ? 10 : 12;
+  const visibleSeatCount = Math.max(
+    seatCount,
+    minimumSeatCount,
+  ) as DashboardSeatCount;
+
+  useEffect(() => {
+    if (seatCount < minimumSeatCount) {
+      setSeatCount(minimumSeatCount);
+    }
+  }, [minimumSeatCount, seatCount]);
 
   const activeTableCount = new Set(
     (active.data ?? []).map((session) => session.table.id),
@@ -440,6 +460,38 @@ function Dashboard() {
             </Button>
           </div>
 
+          <fieldset
+            className="flex h-10 items-center gap-2 rounded-lg border bg-muted/20 px-2"
+            aria-label="Seats shown per table"
+          >
+            <Armchair className="h-4 w-4 text-muted-foreground" />
+            {([8, 10, 12] as const).map((count) => {
+              const disabled = count < minimumSeatCount;
+
+              return (
+                <label
+                  key={count}
+                  className={`flex items-center gap-1 text-xs font-semibold ${
+                    disabled
+                      ? "cursor-not-allowed opacity-40"
+                      : "cursor-pointer"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="dashboard-seat-count"
+                    value={count}
+                    checked={visibleSeatCount === count}
+                    disabled={disabled}
+                    onChange={() => setSeatCount(count)}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  <span>{count}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+
           <Button
             type="button"
             size="sm"
@@ -593,11 +645,20 @@ function Dashboard() {
                   <div
                     className={
                       dashboardView === "compact"
-                        ? "grid grid-flow-col grid-cols-2 grid-rows-6 gap-px overflow-hidden rounded-lg border bg-border"
+                        ? `grid grid-flow-col grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border ${
+                            visibleSeatCount === 8
+                              ? "grid-rows-4"
+                              : visibleSeatCount === 10
+                                ? "grid-rows-5"
+                                : "grid-rows-6"
+                          }`
                         : "divide-y overflow-hidden rounded-lg border"
                     }
                   >
-                    {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                    {Array.from(
+                      { length: visibleSeatCount },
+                      (_, index) => index + 1,
+                    ).map(
                       (seatNumber) => {
                         const session = seatedPlayers.find(
                           (item) => item.seat_number === seatNumber,
