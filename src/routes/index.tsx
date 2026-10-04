@@ -151,7 +151,11 @@ function Dashboard() {
               return (
                 <div
                   key={session.id}
-                  className="flex min-h-9 items-center gap-2 px-2 py-1.5"
+                  className={`flex min-h-9 items-center gap-2 px-2 py-1.5 ${
+                    openSitout
+                      ? "bg-amber-400/10"
+                      : "bg-emerald-500/8"
+                  }`}
                 >
                   <span className="w-8 shrink-0 text-xs font-bold tabular-nums text-muted-foreground">
                     {seatNumber ? `#${seatNumber}` : "—"}
