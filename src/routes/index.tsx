@@ -697,8 +697,10 @@ function DraggablePlayerRow({
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-center gap-1.5 transition-all ${
-        compact ? "min-h-8 px-1.5 py-1" : "min-h-9 px-2 py-1.5"
+      className={`flex items-center transition-all ${
+        compact
+          ? "min-h-8 gap-[3px] px-1.5 py-1"
+          : "min-h-9 gap-1.5 px-2 py-1.5"
       } ${
         openSitout
           ? "bg-amber-50 dark:bg-amber-400/10"
@@ -709,7 +711,7 @@ function DraggablePlayerRow({
     >
       <span
         className={`shrink-0 font-bold tabular-nums text-muted-foreground ${
-          compact ? "w-7 text-[11px]" : "w-8 text-xs"
+          compact ? "w-5 text-right text-[11px]" : "w-8 text-xs"
         }`}
       >
         {seatNumber ? `#${seatNumber}` : "—"}
