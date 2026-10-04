@@ -104,23 +104,18 @@ import {
 const GAME_TYPE_STYLES = [
   {
     header: "bg-sky-50/80 dark:bg-sky-500/10",
-    dot: "bg-sky-500",
   },
   {
     header: "bg-amber-50/80 dark:bg-amber-500/10",
-    dot: "bg-amber-500",
   },
   {
     header: "bg-violet-50/80 dark:bg-violet-500/10",
-    dot: "bg-violet-500",
   },
   {
     header: "bg-rose-50/80 dark:bg-rose-500/10",
-    dot: "bg-rose-500",
   },
   {
     header: "bg-teal-50/80 dark:bg-teal-500/10",
-    dot: "bg-teal-500",
   },
 ] as const;
 
@@ -537,12 +532,8 @@ function Dashboard() {
                         ·
                       </span>
 
-                      <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground">
-                        <span
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${gameTypeStyle.dot}`}
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">{table.game_type}</span>
+                      <span className="truncate text-sm text-muted-foreground">
+                        {table.game_type}
                       </span>
                     </div>
 
