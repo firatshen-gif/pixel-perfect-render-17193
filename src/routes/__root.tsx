@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppNav } from "@/components/AppNav";
+import { AuthGate } from "@/components/AuthGate";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -126,10 +127,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppNav />
-      <main className="mx-auto max-w-7xl px-4 py-6 md:py-8">
-        <Outlet />
-      </main>
+      <AuthGate>
+        <AppNav />
+        <main className="mx-auto max-w-7xl px-4 py-6 md:py-8">
+          <Outlet />
+        </main>
+      </AuthGate>
       <Toaster richColors position="bottom-right" />
     </QueryClientProvider>
   );
