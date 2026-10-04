@@ -169,6 +169,7 @@ function Dashboard() {
 
     const target = event.over.data.current;
     if (target?.["kind"] !== "seat") return;
+    if (target?.["occupied"]) return;
 
     const newTableId = String(target["tableId"]);
     const newSeatNumber = Number(target["seatNumber"]);
@@ -458,7 +459,7 @@ function Dashboard() {
                               key={seatNumber}
                               tableId={table.id}
                               seatNumber={seatNumber}
-                              disabled
+                              occupied
                             >
                               <DraggablePlayerRow
                                 session={session}
@@ -617,12 +618,12 @@ function Dashboard() {
 function SeatDropTarget({
   tableId,
   seatNumber,
-  disabled = false,
+  occupied = false,
   children,
 }: {
   tableId: string;
   seatNumber: number;
-  disabled?: boolean;
+  occupied?: boolean;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -631,20 +632,20 @@ function SeatDropTarget({
       kind: "seat",
       tableId,
       seatNumber,
+      occupied,
     },
-    disabled,
   });
 
   return (
-    <div
-      ref={setNodeRef}
-      className={
-        isOver && !disabled
-          ? "bg-primary/10 ring-2 ring-inset ring-primary/40"
-          : undefined
-      }
-    >
+    <div ref={setNodeRef} className="relative">
       {children}
+
+      {isOver && !occupied && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-20 bg-primary/10 ring-2 ring-inset ring-primary/60"
+        />
+      )}
     </div>
   );
 }
