@@ -1446,9 +1446,18 @@ function DraggablePlayerRow({
       } ${highlighted ? "ring-1 ring-inset ring-primary/50" : ""}`}
     >
       <span
-        className={`shrink-0 font-bold tabular-nums text-muted-foreground ${
-          compact ? "w-5 text-right text-[11px]" : "w-8 text-xs"
-        }`}
+        className={`shrink-0 font-bold tabular-nums ${
+          openSitout
+            ? "text-amber-600 dark:text-amber-300"
+            : "text-success"
+        } ${compact ? "w-5 text-right text-[11px]" : "w-8 text-xs"}`}
+        title={
+          openSitout
+            ? `Sitting out for ${formatLiveDuration(
+                now - new Date(openSitout.sat_out_at).getTime(),
+              )}`
+            : "Sitting in"
+        }
       >
         {seatNumber ? `#${seatNumber}` : "—"}
       </span>
@@ -1475,28 +1484,6 @@ function DraggablePlayerRow({
         </Tooltip>
 
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {openSitout ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 ring-1 ring-amber-500/40"
-                  tabIndex={0}
-                  aria-label={`Sitting out for ${formatLiveDuration(
-                    now - new Date(openSitout.sat_out_at).getTime(),
-                  )}`}
-                />
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Sitting out for{" "}
-                {formatLiveDuration(
-                  now - new Date(openSitout.sat_out_at).getTime(),
-                )}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <span className="live-dot shrink-0" />
-          )}
-
           {!compact && (
             <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
