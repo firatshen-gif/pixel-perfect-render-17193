@@ -212,6 +212,9 @@ function Dashboard() {
   );
   const sittingOutCount = sittingOutPlayerIds.size;
   const activePlayerCount = totalPlayerCount - sittingOutCount;
+  const draggedSessionSitout = draggedSession?.sitouts.find(
+    (sitout) => !sitout.sat_in_at,
+  );
 
   const sortedGameTypes = Array.from(
     new Set((tables.data ?? []).map((table) => table.game_type)),
@@ -849,18 +852,29 @@ function Dashboard() {
 
         <DragOverlay>
           {draggedSession ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-lg">
-              <GripVertical className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-bold text-muted-foreground">
-                {draggedSession.seat_number
-                  ? `#${draggedSession.seat_number}`
-                  : "—"}
+            <div
+              className={`flex min-h-8 items-center gap-[3px] rounded-lg border px-1.5 py-1 shadow-lg ${
+                draggedSessionSitout
+                  ? "bg-amber-50 dark:bg-amber-400/10"
+                  : "bg-emerald-50 dark:bg-emerald-400/10"
+              }`}
+            >
+              <span
+                className={`w-5 shrink-0 text-left text-[11px] font-bold tabular-nums ${
+                  draggedSessionSitout
+                    ? "text-amber-600 dark:text-amber-300"
+                    : "text-success"
+                }`}
+              >
+                {draggedSession.seat_number ?? "—"}
               </span>
-              <span className="text-sm font-semibold">
+              <span className="min-w-0 flex-1 truncate text-xs font-semibold">
                 {draggedSession.player.full_name}
               </span>
-              <span className="text-xs text-muted-foreground">
-                {draggedSession.table.name}
+              <span className="shrink-0 font-mono text-[9px] font-bold tracking-tight text-success tabular-nums">
+                {formatLiveDuration(
+                  sessionMs(draggedSession.seated_at, null, now),
+                )}
               </span>
             </div>
           ) : draggedWaitlistEntry ? (
