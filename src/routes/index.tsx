@@ -115,6 +115,7 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const tables = useTables();
   const active = useActiveSessions();
+  const players = usePlayers();
   const dragMovePlayer = useMovePlayer();
 
   // Update the visible session timers every second.
@@ -138,6 +139,20 @@ function Dashboard() {
   const [playerSearch, setPlayerSearch] = useState("");
 
   const normalizedSearch = playerSearch.trim().toLowerCase();
+
+  const activeTableCount = new Set(
+    (active.data ?? []).map((session) => session.table.id),
+  ).size;
+  const activePlayerCount = new Set(
+    (active.data ?? []).map((session) => session.player.id),
+  ).size;
+  const sittingOutCount = new Set(
+    (active.data ?? [])
+      .filter((session) =>
+        session.sitouts.some((sitout) => !sitout.sat_in_at),
+      )
+      .map((session) => session.player.id),
+  ).size;
 
   const handleDragStart = (event: DragStartEvent) => {
     const sessionId = event.active.data.current?.sessionId as string | undefined;
@@ -208,7 +223,7 @@ function Dashboard() {
     );
   };
 
-  if (tables.isLoading || active.isLoading) {
+  if (tables.isLoading || active.isLoading || players.isLoading) {
     return (
       <>
         <PageHeader
@@ -228,7 +243,7 @@ function Dashboard() {
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-2.5">
-        <div className="relative w-full sm:max-w-sm">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={playerSearch}
@@ -236,6 +251,52 @@ function Dashboard() {
             placeholder="Search player…"
             className="h-10 pl-9"
           />
+        </div>
+
+        <div
+          className="flex h-8 shrink-0 items-center divide-x overflow-hidden rounded-lg border bg-muted/20"
+          aria-label="Tournament totals"
+        >
+          <div className="flex items-baseline gap-1 px-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Tables
+            </span>
+            <span className="text-sm font-bold tabular-nums">
+              {tables.data?.length ?? 0}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1 px-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Active tbl
+            </span>
+            <span className="text-sm font-bold tabular-nums text-success">
+              {activeTableCount}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1 px-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Players
+            </span>
+            <span className="text-sm font-bold tabular-nums">
+              {players.data?.length ?? 0}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1 px-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Active pl
+            </span>
+            <span className="text-sm font-bold tabular-nums text-success">
+              {activePlayerCount}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1 px-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Sit out
+            </span>
+            <span className="text-sm font-bold tabular-nums text-amber-600 dark:text-amber-300">
+              {sittingOutCount}
+            </span>
+          </div>
         </div>
 
         <div
