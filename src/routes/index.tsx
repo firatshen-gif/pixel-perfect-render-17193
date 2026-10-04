@@ -176,7 +176,7 @@ function Dashboard() {
   );
   const [seatCount, setSeatCount] = useState<DashboardSeatCount>(8);
   const [playerSearch, setPlayerSearch] = useState("");
-  const [waitlistOpen, setWaitlistOpen] = useState(true);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const normalizedSearch = playerSearch.trim().toLowerCase();
 
