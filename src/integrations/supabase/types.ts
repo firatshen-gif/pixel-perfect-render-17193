@@ -133,6 +133,32 @@ export type Database = {
           },
         ]
       }
+      waitlist: {
+        Row: {
+          added_at: string
+          id: string
+          player_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          player_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: true
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_sitouts: {
         Row: {
           created_at: string
